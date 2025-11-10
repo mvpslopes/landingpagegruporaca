@@ -7,7 +7,7 @@ const auctions = [
     date: '15 de Dezembro, 2024',
     location: 'Belo Horizonte, MG',
     participants: '120+ animais',
-    image: 'https://images.pexels.com/photos/1996333/pexels-photo-1996333.jpeg',
+    image: '/close-up-no-cavalo-ao-ar-livre.jpg',
     status: 'Em breve'
   },
   {
@@ -16,7 +16,7 @@ const auctions = [
     date: '20 de Novembro, 2024',
     location: 'São Paulo, SP',
     participants: '85+ animais',
-    image: 'https://images.pexels.com/photos/2253275/pexels-photo-2253275.jpeg',
+    image: '/lindo-cavalo-castanho-close-up-focinho-aparencia-bonita-juba-plano-de-fundo-campo-de-atletismo-curral-arvores-cavalos-sao-animais-maravilhosos.jpg',
     status: 'Inscrições abertas'
   },
   {
@@ -25,71 +25,102 @@ const auctions = [
     date: '5 de Janeiro, 2025',
     location: 'Rio de Janeiro, RJ',
     participants: '95+ animais',
-    image: 'https://images.pexels.com/photos/3791424/pexels-photo-3791424.jpeg',
+    image: '/lindo-cavalo-marrom-ao-ar-livre.jpg',
     status: 'Em breve'
   }
 ];
 
 export default function FeaturedAuctions() {
   return (
-    <section id="leiloes" className="py-20 bg-gray-50">
+    <section id="leiloes" className="py-24 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-black mb-4">Leilões em Destaque</h2>
-          <div className="h-1 w-24 bg-gradient-to-r from-gray-600 to-gray-900 mx-auto"></div>
+        <div className="text-center mb-20">
+          <div className="inline-block mb-4">
+            <span className="px-4 py-2 bg-black/5 rounded-full text-sm font-semibold text-gray-700">
+              Próximos Eventos
+            </span>
+          </div>
+          <h2 className="text-5xl md:text-6xl font-extrabold text-black mb-6">
+            Leilões em <span 
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage: 'linear-gradient(to right, #000000, #808080, #000000)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >Destaque</span>
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Participe dos maiores eventos de leilões de cavalos de elite do país
+          </p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {auctions.map((auction) => (
+          {auctions.map((auction, index) => (
             <div
               key={auction.id}
-              className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 group"
+              className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-100 hover:border-gray-200"
+              style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="relative h-64 overflow-hidden">
+              <div className="relative h-72 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10"></div>
                 <img
                   src={auction.image}
                   alt={auction.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                <div className="absolute top-4 right-4 bg-black text-white px-4 py-2 rounded-full text-sm font-semibold">
-                  {auction.status}
+                <div className="absolute top-6 right-6 z-20">
+                  <span className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md ${
+                    auction.status === 'Inscrições abertas' 
+                      ? 'bg-green-500/90 text-white border border-green-400/50' 
+                      : 'bg-black/70 text-white border border-white/20'
+                  }`}>
+                    {auction.status}
+                  </span>
+                </div>
+                <div className="absolute bottom-6 left-6 right-6 z-20">
+                  <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">{auction.title}</h3>
                 </div>
               </div>
 
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-black mb-4">{auction.title}</h3>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center text-gray-600">
-                    <Calendar size={18} className="mr-3" />
-                    <span>{auction.date}</span>
+              <div className="p-6 space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center text-gray-700 group-hover:text-black transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-black group-hover:text-white flex items-center justify-center mr-3 transition-all duration-300">
+                      <Calendar size={18} />
+                    </div>
+                    <span className="font-medium">{auction.date}</span>
                   </div>
-                  <div className="flex items-center text-gray-600">
-                    <MapPin size={18} className="mr-3" />
-                    <span>{auction.location}</span>
+                  <div className="flex items-center text-gray-700 group-hover:text-black transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-black group-hover:text-white flex items-center justify-center mr-3 transition-all duration-300">
+                      <MapPin size={18} />
+                    </div>
+                    <span className="font-medium">{auction.location}</span>
                   </div>
-                  <div className="flex items-center text-gray-600">
-                    <Users size={18} className="mr-3" />
-                    <span>{auction.participants}</span>
+                  <div className="flex items-center text-gray-700 group-hover:text-black transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-black group-hover:text-white flex items-center justify-center mr-3 transition-all duration-300">
+                      <Users size={18} />
+                    </div>
+                    <span className="font-medium">{auction.participants}</span>
                   </div>
                 </div>
 
-                <button className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center gap-2 font-semibold">
+                <button className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02]">
                   Ver Detalhes
-                  <ArrowRight size={18} />
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="text-center mt-12">
+        <div className="text-center mt-16">
           <a
             href="#site"
-            className="inline-flex items-center gap-2 text-black font-semibold hover:text-gray-600 transition-colors duration-200"
+            className="inline-flex items-center gap-3 text-black font-bold hover:text-gray-600 transition-all duration-300 group text-lg"
           >
             Ver todos os leilões no site oficial
-            <ArrowRight size={20} />
+            <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
           </a>
         </div>
       </div>
