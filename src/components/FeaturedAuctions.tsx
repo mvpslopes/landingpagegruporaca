@@ -3,7 +3,7 @@ import { Calendar, MapPin, Users, ArrowRight } from 'lucide-react';
 const auctions = [
   {
     id: 1,
-    title: 'Leil\u00e3o Elite 2024',
+    title: 'Leilão Elite 2024',
     date: '15 de Dezembro, 2024',
     location: 'Belo Horizonte, MG',
     participants: '120+ animais',
@@ -12,16 +12,16 @@ const auctions = [
   },
   {
     id: 2,
-    title: 'Leil\u00e3o Primavera',
+    title: 'Leilão Primavera',
     date: '20 de Novembro, 2024',
-    location: 'S\u00e3o Paulo, SP',
+    location: 'São Paulo, SP',
     participants: '85+ animais',
     image: 'https://images.pexels.com/photos/2253275/pexels-photo-2253275.jpeg',
-    status: 'Inscri\u00e7\u00f5es abertas'
+    status: 'Inscrições abertas'
   },
   {
     id: 3,
-    title: 'Leil\u00e3o Especial',
+    title: 'Leilão Especial',
     date: '5 de Janeiro, 2025',
     location: 'Rio de Janeiro, RJ',
     participants: '95+ animais',
@@ -35,7 +35,7 @@ export default function FeaturedAuctions() {
     <section id="leiloes" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-black mb-4">Leil\u00f5es em Destaque</h2>
+          <h2 className="text-4xl font-bold text-black mb-4">Leilões em Destaque</h2>
           <div className="h-1 w-24 bg-gradient-to-r from-gray-600 to-gray-900 mx-auto"></div>
         </div>
 
@@ -88,7 +88,7 @@ export default function FeaturedAuctions() {
             href="#site"
             className="inline-flex items-center gap-2 text-black font-semibold hover:text-gray-600 transition-colors duration-200"
           >
-            Ver todos os leil\u00f5es no site oficial
+            Ver todos os leilões no site oficial
             <ArrowRight size={20} />
           </a>
         </div>

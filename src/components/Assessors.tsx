@@ -4,7 +4,7 @@ const assessors = [
   {
     id: 1,
     name: 'Ariane Silva',
-    specialty: 'Assessoria T\u00e9cnica',
+    specialty: 'Assessoria Técnica',
     phone: '(31) 98765-4321',
     email: 'ariane@gruporaca.com.br',
     whatsapp: '5531987654321'
@@ -12,7 +12,7 @@ const assessors = [
   {
     id: 2,
     name: 'Bruno Souza Lima',
-    specialty: 'Assessoria T\u00e9cnica',
+    specialty: 'Assessoria Técnica',
     phone: '(31) 98765-4322',
     email: 'bruno@gruporaca.com.br',
     whatsapp: '5531987654322'
@@ -28,7 +28,7 @@ const assessors = [
   {
     id: 4,
     name: 'Marina Rodrigues',
-    specialty: 'Gest\u00e3o de Leil\u00f5es',
+    specialty: 'Gestão de Leilões',
     phone: '(31) 98765-4324',
     email: 'marina@gruporaca.com.br',
     whatsapp: '5531987654324'
@@ -43,7 +43,7 @@ export default function Assessors() {
           <h2 className="text-4xl font-bold text-black mb-4">Nossos Assessores</h2>
           <div className="h-1 w-24 bg-gradient-to-r from-gray-600 to-gray-900 mx-auto mb-4"></div>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Profissionais especializados prontos para atender voc\u00ea com excel\u00eancia
+            Profissionais especializados prontos para atender você com excelência
           </p>
         </div>
 
