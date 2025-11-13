@@ -43,7 +43,7 @@ export const mockAuctions = [
     title: 'Leilão Primavera',
     date: '2024-11-20',
     location: 'São Paulo, SP',
-    status: 'inscricoes_abertas',
+    status: 'no_ar',
     total_animals: 85,
     registered_bidders: 32,
     created_at: '2024-10-15T10:00:00Z'

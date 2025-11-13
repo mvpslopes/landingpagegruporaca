@@ -15,7 +15,7 @@ export default function CTA() {
             </h2>
             
             <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed whitespace-nowrap">
-              Conectamos você às melhores oportunidades do mercado equestre
+              Conectamos você as melhores oportunidades do mercado equestre
             </p>
             
             <div className="flex flex-wrap gap-4 justify-center pt-4">

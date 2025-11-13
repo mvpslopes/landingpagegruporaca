@@ -17,7 +17,7 @@ const auctions = [
     location: 'São Paulo, SP',
     participants: '85+ animais',
     image: '/Leilão 02.jpg',
-    status: 'Inscrições abertas'
+    status: 'No ar'
   },
   {
     id: 3,
@@ -26,7 +26,7 @@ const auctions = [
     location: 'Rio de Janeiro, RJ',
     participants: '95+ animais',
     image: '/Leilão 03.jpg',
-    status: 'Em breve'
+    status: 'Encerrado'
   }
 ];
 
@@ -71,8 +71,10 @@ export default function FeaturedAuctions() {
                 />
                 <div className="absolute top-6 right-6 z-20">
                   <span className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md ${
-                    auction.status === 'Inscrições abertas' 
+                    auction.status === 'No ar' 
                       ? 'bg-green-500/90 text-white border border-green-400/50' 
+                      : auction.status === 'Encerrado'
+                      ? 'bg-gray-500/90 text-white border border-gray-400/50'
                       : 'bg-black/70 text-white border border-white/20'
                   }`}>
                     {auction.status}

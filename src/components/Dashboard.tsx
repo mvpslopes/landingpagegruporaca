@@ -430,11 +430,13 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                             <td className="px-6 py-4 text-gray-600">{auction.location}</td>
                             <td className="px-6 py-4">
                               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                auction.status === 'inscricoes_abertas' 
+                                auction.status === 'no_ar' 
                                   ? 'bg-green-100 text-green-700'
+                                  : auction.status === 'encerrado'
+                                  ? 'bg-gray-100 text-gray-700'
                                   : 'bg-yellow-100 text-yellow-700'
                               }`}>
-                                {auction.status === 'inscricoes_abertas' ? 'Inscrições Abertas' : 'Em Breve'}
+                                {auction.status === 'no_ar' ? 'No ar' : auction.status === 'encerrado' ? 'Encerrado' : 'Em breve'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-gray-600">{auction.total_animals}</td>
@@ -741,11 +743,13 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                             </div>
                           </div>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            auction.status === 'inscricoes_abertas' 
+                            auction.status === 'no_ar' 
                               ? 'bg-green-100 text-green-700'
+                              : auction.status === 'encerrado'
+                              ? 'bg-gray-100 text-gray-700'
                               : 'bg-yellow-100 text-yellow-700'
                           }`}>
-                            {auction.status === 'inscricoes_abertas' ? 'Inscrições Abertas' : 'Em Breve'}
+                            {auction.status === 'no_ar' ? 'No ar' : auction.status === 'encerrado' ? 'Encerrado' : 'Em breve'}
                           </span>
                         </div>
                       ))}
@@ -957,8 +961,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
             <select name="status" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none">
-              <option value="em_breve">Em Breve</option>
-              <option value="inscricoes_abertas">Inscrições Abertas</option>
+              <option value="em_breve">Em breve</option>
+              <option value="no_ar">No ar</option>
+              <option value="encerrado">Encerrado</option>
             </select>
           </div>
           <div className="flex gap-3 pt-4">

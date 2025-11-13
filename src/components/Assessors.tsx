@@ -50,7 +50,7 @@ export default function Assessors() {
         <div className="text-center mb-20">
           <div className="inline-block mb-4">
             <span className="px-4 py-2 bg-black/5 rounded-full text-sm font-semibold text-gray-700">
-              Conheça nossa Equipe
+              Conheça nossa equipe
             </span>
           </div>
           <h2 className="text-5xl md:text-6xl font-extrabold text-black mb-6">
