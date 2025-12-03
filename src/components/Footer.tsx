@@ -40,7 +40,7 @@ export default function Footer() {
               Excelência em leilões de cavalos de elite.
             </p>
             <a
-              href="https://gruporaca-site.vercel.app/"
+              href="https://ariane.agrobold.com.br/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 rounded-lg hover:bg-gray-200 transition-all duration-200 font-semibold"
