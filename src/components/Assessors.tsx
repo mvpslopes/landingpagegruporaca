@@ -3,6 +3,7 @@ import { Phone, MessageCircle } from 'lucide-react';
 // Mapeamento de nomes existentes com seus dados
 const existingAssessors: Record<string, { phone: string; whatsapp: string; email: string }> = {
   'HUGO': { phone: '(21) 98122-5464', whatsapp: '5521981225464', email: 'hugo.ferrari@gruporaca.com.br' },
+  'HUGO FERRARI': { phone: '(21) 98122-5464', whatsapp: '5521981225464', email: 'hugo.ferrari@gruporaca.com.br' },
   'GABRIELA': { phone: '(31) 99881-6001', whatsapp: '5531998816001', email: 'gabriela.barcelos@gruporaca.com.br' },
   'GABRIEL': { phone: '(31) 9642-7108', whatsapp: '553196427108', email: 'gabriel.araujo@gruporaca.com.br' },
   'DUDU ÁGUIA': { phone: '(32) 99909-8350', whatsapp: '5532999098350', email: 'dudu.aguia@gruporaca.com.br' },
@@ -11,7 +12,7 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'JM': { phone: '(37) 99963-6962', whatsapp: '5537999636962', email: 'jm.assessoria@gruporaca.com.br' },
   'JOÃO PAULO': { phone: '(12) 99715-5058', whatsapp: '5512997155058', email: 'joao.paulo@gruporaca.com.br' },
   'JUNINHO': { phone: '(31) 98531-4468', whatsapp: '5531985314468', email: 'juninho@gruporaca.com.br' },
-  'KAUAN': { phone: '(37) 99669-001', whatsapp: '553799669001', email: 'kauan@gruporaca.com.br' },
+  'KAUAN': { phone: '(37) 99669-0014', whatsapp: '5537996690014', email: 'kauan@gruporaca.com.br' },
   'QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GABRIEL QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GREGÓRIO': { phone: '(21) 98166-1949', whatsapp: '5521981661949', email: 'gregorio.neves@gruporaca.com.br' },
@@ -61,15 +62,25 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'BRUNO': { phone: '(32) 9198-0744', whatsapp: '553291980744', email: 'bruno@gruporaca.com.br' },
   'BRUNO SOUZA LIMA': { phone: '(32) 9198-0744', whatsapp: '553291980744', email: 'bruno.souza.lima@gruporaca.com.br' },
   'DAVID CHARLES': { phone: '(31) 9194-4423', whatsapp: '553191944423', email: 'david.charles@gruporaca.com.br' },
+  'EVOLUÇÃO DA MARCHA': { phone: '(21) 96015-9538', whatsapp: '5521960159538', email: 'evolucao.marcha@gruporaca.com.br' },
+  'MELQUIADES LEANDRO': { phone: '(31) 9843-7379', whatsapp: '553198437379', email: 'melquiades.leandro@gruporaca.com.br' },
 };
+
+// Função auxiliar para formatar nome - FORÇA MAIÚSCULAS
+function formatName(name: string): string {
+  // Garantir que o nome esteja em maiúsculas - TRIPLA PROTEÇÃO
+  if (!name) return '';
+  return String(name).toUpperCase().trim();
+}
 
 // Função auxiliar para criar assessor
 function createAssessor(name: string, id: number) {
-  const existing = existingAssessors[name.toUpperCase()];
+  const nameUpper = String(name).toUpperCase().trim();
+  const existing = existingAssessors[nameUpper];
   if (existing) {
     return {
       id,
-      name,
+      name: formatName(name), // Já retorna em maiúsculas
       specialty: 'Assessoria Comercial',
       phone: existing.phone,
       email: existing.email,
@@ -79,7 +90,7 @@ function createAssessor(name: string, id: number) {
   // Se não existe, criar sem dados de contato
   return {
     id,
-    name,
+    name: formatName(name), // Já retorna em maiúsculas
     specialty: 'Assessoria Comercial',
     phone: '',
     email: '',
@@ -99,7 +110,7 @@ const assessoriaGrupoRacaList = [
   'GABRIEL QUEIXADA',
   'GABRIELA',
   'GREGÓRIO',
-  'HUGO',
+  'HUGO FERRARI',
   'JM',
   'JOÃO CATIREIROS',
   'JOÃO PAULO',
@@ -108,6 +119,7 @@ const assessoriaGrupoRacaList = [
   'KAIKE',
   'KAUAN',
   'LEONE',
+  'MELQUIADES LEANDRO',
   'MARCOS PIQUITO',
   'MARTINS',
   'MICHEL GODOI',
@@ -116,7 +128,8 @@ const assessoriaGrupoRacaList = [
   'STEVAN',
   'TILÃO',
   'VERONESE',
-  'VINÍCIUS RODRIGUES'
+  'VINÍCIUS RODRIGUES',
+  'EVOLUÇÃO DA MARCHA'
 ].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
 const assessoriaGrupoRaca = [
@@ -191,8 +204,8 @@ export default function Assessors() {
                 >
                   <div className="mb-4 sm:mb-6">
                     <div className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 rounded-xl p-4 sm:p-5 md:p-6 text-center group-hover:border-black group-hover:bg-gradient-to-br group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
-                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words">
-                        {assessor.name}
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words uppercase" style={{ textTransform: 'uppercase' }}>
+                        {assessor.name.toUpperCase()}
                       </h3>
                     </div>
                   </div>
@@ -244,8 +257,8 @@ export default function Assessors() {
                 >
                   <div className="mb-4 sm:mb-6">
                     <div className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 rounded-xl p-4 sm:p-5 md:p-6 text-center group-hover:border-black group-hover:bg-gradient-to-br group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
-                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words">
-                        {assessor.name}
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words uppercase" style={{ textTransform: 'uppercase' }}>
+                        {assessor.name.toUpperCase()}
                       </h3>
                     </div>
                   </div>
@@ -297,8 +310,8 @@ export default function Assessors() {
                 >
                   <div className="mb-4 sm:mb-6">
                     <div className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 rounded-xl p-4 sm:p-5 md:p-6 text-center group-hover:border-black group-hover:bg-gradient-to-br group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
-                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words">
-                        {assessor.name}
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words uppercase" style={{ textTransform: 'uppercase' }}>
+                        {assessor.name.toUpperCase()}
                       </h3>
                     </div>
                   </div>
