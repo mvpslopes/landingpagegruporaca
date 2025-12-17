@@ -47,7 +47,7 @@ export default function Footer() {
               Especialistas em leilões de elite, unindo tradição, inovação e excelência para impulsionar o mercado de criação.
             </p>
             <a
-              href="https://gruporaca.com/"
+              href="https://gruporaca.app.br/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 rounded-lg hover:bg-gray-200 transition-all duration-200 font-semibold"

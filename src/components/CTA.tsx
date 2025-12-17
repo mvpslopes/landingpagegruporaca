@@ -1,4 +1,4 @@
-import { ArrowRight, Calendar, Phone } from 'lucide-react';
+import { ArrowRight, Calendar } from 'lucide-react';
 
 export default function CTA() {
   return (
@@ -30,17 +30,19 @@ export default function CTA() {
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <a
                 href="#leiloes"
-                className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105"
+                className="group bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:scale-105"
               >
                 Leilões NO AR
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="#assessores"
-                className="group bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:scale-105"
+                href="https://gruporaca.app.br/cadastro"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105"
               >
-                <Phone size={20} />
-                Contatos
+                Cadastre-se
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </a>
             </div>
             

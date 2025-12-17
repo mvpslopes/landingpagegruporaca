@@ -9,6 +9,7 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'DUDU ÁGUIA': { phone: '(32) 99909-8350', whatsapp: '5532999098350', email: 'dudu.aguia@gruporaca.com.br' },
   'ERICK': { phone: '(31) 99995-2074', whatsapp: '5531999952074', email: 'erick@gruporaca.com.br' },
   'CARLOS EDUARDO': { phone: '(32) 99804-0180', whatsapp: '5532998040180', email: 'carlos.eduardo@gruporaca.com.br' },
+  'DUDU GUIDUCCI': { phone: '(32) 99804-0180', whatsapp: '5532998040180', email: 'dudu.guiducci@gruporaca.com.br' },
   'JM': { phone: '(37) 99963-6962', whatsapp: '5537999636962', email: 'jm.assessoria@gruporaca.com.br' },
   'JOÃO PAULO': { phone: '(12) 99715-5058', whatsapp: '5512997155058', email: 'joao.paulo@gruporaca.com.br' },
   'JUNINHO': { phone: '(31) 98531-4468', whatsapp: '5531985314468', email: 'juninho@gruporaca.com.br' },
@@ -64,6 +65,8 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'DAVID CHARLES': { phone: '(31) 9194-4423', whatsapp: '553191944423', email: 'david.charles@gruporaca.com.br' },
   'EVOLUÇÃO DA MARCHA': { phone: '(21) 96015-9538', whatsapp: '5521960159538', email: 'evolucao.marcha@gruporaca.com.br' },
   'MELQUIADES LEANDRO': { phone: '(31) 9843-7379', whatsapp: '553198437379', email: 'melquiades.leandro@gruporaca.com.br' },
+  'ROGÉRIO FÁVERO': { phone: '(27) 99961-6321', whatsapp: '5527999616321', email: 'rogerio.favero@gruporaca.com.br' },
+  'RAÇA E MARCHA': { phone: '(31) 9826-7101', whatsapp: '553198267101', email: '' },
 };
 
 // Função auxiliar para formatar nome - FORÇA MAIÚSCULAS
@@ -102,7 +105,7 @@ function createAssessor(name: string, id: number) {
 const assessoriaGrupoRacaList = [
   'BRUNO SOUZA LIMA',
   'BRUNO LAGARTIXA',
-  'CARLOS EDUARDO',
+  'DUDU GUIDUCCI',
   'DUDU ÁGUIA',
   'ERICK',
   'FELIPE SÁ',
@@ -152,13 +155,15 @@ const assessoria = [
 const assessoriasParceiras = [
   'GREKO',
   'JEFERSON',
+  'MARCELO ZEFERINO',
   'MICHEL GODOI',
   'PEDRO',
   'RAMIRO',
+  'RAÇA E MARCHA',
+  'ROGÉRIO FÁVERO',
   'RUY GOMES',
   'TICO',
   'TRANCA',
-  'MARCELO ZEFERINO',
   'ZIRDA'
 ].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((name, index) => createAssessor(name, assessoriaGrupoRaca.length + assessoria.length + index + 1));
 

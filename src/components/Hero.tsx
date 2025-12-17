@@ -21,14 +21,14 @@ export default function Hero() {
           {/* Conteúdo principal */}
           <div className="space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8 animate-fade-in w-full">
             <div className="inline-block">
-              <span className="px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-[10px] sm:text-xs md:text-sm font-semibold text-white/90">
+              <span className="px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-sm sm:text-xs md:text-sm font-semibold text-white/90" style={{ fontSize: '1rem' }}>
                 Referência Nacional em Leilões
               </span>
             </div>
             
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-extrabold leading-[1.1] sm:leading-tight text-white">
+            <h1 className="text-5xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-extrabold leading-[1.1] sm:leading-tight text-white">
               {/* Versão Mobile */}
-              <div className="sm:hidden">
+              <div className="sm:hidden" style={{ fontSize: '3rem', lineHeight: '1.1' }}>
                 <div>Estamos</div>
                 <div>prontos para</div>
                 <div>elevar o</div>
@@ -44,9 +44,9 @@ export default function Hero() {
               </div>
             </h1>
             
-            <div className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl text-gray-300 leading-snug sm:leading-relaxed max-w-2xl">
+            <div className="text-lg sm:text-base md:text-lg lg:text-xl xl:text-2xl text-gray-300 leading-snug sm:leading-relaxed max-w-2xl">
               {/* Versão Mobile */}
-              <div className="sm:hidden">
+              <div className="sm:hidden" style={{ fontSize: '1.25rem', lineHeight: '1.5' }}>
                 <div>Conectando criadores</div>
                 <div>e apaixonados</div>
                 <div>
@@ -88,7 +88,7 @@ export default function Hero() {
                 <ChevronRight size={16} className="sm:w-4 sm:h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="https://gruporaca.com/"
+                href="https://gruporaca.app.br/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group bg-transparent border-2 border-white/30 text-white px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-white/10 hover:border-white/50 transition-all duration-300 backdrop-blur-sm hover:scale-105 text-xs sm:text-sm md:text-base text-center w-full sm:w-auto"
@@ -100,8 +100,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+      {/* Scroll indicator - apenas desktop */}
+      <div className="hidden sm:block absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
         <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
           <div className="w-1 h-3 bg-white/50 rounded-full mt-2"></div>
         </div>

@@ -24,8 +24,26 @@ const copyHtaccess = () => {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), copyHtaccess()],
+  // Caminho base: projeto roda em subpasta
+  base: '/mvpslopes/landingpagegruporaca/',
   server: {
-    port: 3000,
+    // Porta padrão do Vite (5173) ou próxima disponível
+    proxy: {
+      '/api': {
+        target: 'http://localhost', // Servidor PHP (XAMPP)
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api'),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('⚠️ Erro no proxy da API:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('🔄 Proxy:', req.method, req.url, '→', proxyReq.path);
+          });
+        },
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
