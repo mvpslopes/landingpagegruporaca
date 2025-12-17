@@ -1,0 +1,27 @@
+# Proteção da pasta API
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+
+# Permitir apenas arquivos PHP
+<FilesMatch "\.(json|txt|log)$">
+    Require all denied
+</FilesMatch>
+
+# Proteger arquivo de configuração do banco
+<Files "db_config.php">
+    Require all denied
+</Files>
+
+# Proteger arquivo de usuários (se ainda usar JSON)
+<Files "users.json">
+    Require all denied
+</Files>
+
+# Headers de segurança
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+

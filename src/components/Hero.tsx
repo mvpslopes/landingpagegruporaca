@@ -88,7 +88,7 @@ export default function Hero() {
                 <ChevronRight size={16} className="sm:w-4 sm:h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="https://gruporaca.app.br/"
+                href="https://gruporaca.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group bg-transparent border-2 border-white/30 text-white px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-white/10 hover:border-white/50 transition-all duration-300 backdrop-blur-sm hover:scale-105 text-xs sm:text-sm md:text-base text-center w-full sm:w-auto"

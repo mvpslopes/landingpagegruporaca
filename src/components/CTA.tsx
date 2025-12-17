@@ -36,7 +36,7 @@ export default function CTA() {
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </a>
               <a
-                href="https://gruporaca.app.br/cadastro"
+                href="https://gruporaca.com/cadastro"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105"

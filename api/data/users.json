@@ -1,0 +1,107 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "marcus@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Marcus Lopes",
+      "role": "root",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": true,
+        "manage_permissions": true
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "email": "thaty@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Thaty",
+      "role": "admin",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": false,
+        "manage_permissions": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "email": "lara@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Lara",
+      "role": "admin",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": false,
+        "manage_permissions": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 4,
+      "email": "ana@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Ana Beatriz",
+      "role": "admin",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": false,
+        "manage_permissions": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "email": "larissa@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Larissa Mendes",
+      "role": "admin",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": false,
+        "manage_permissions": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 6,
+      "email": "ariane@gruporaca.com.br",
+      "password": "$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "name": "Ariane Andrade",
+      "role": "admin",
+      "folder": "*",
+      "permissions": {
+        "upload": true,
+        "download": true,
+        "delete": true,
+        "view_all": true,
+        "manage_users": false,
+        "manage_permissions": false
+      },
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+

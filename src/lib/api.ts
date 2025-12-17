@@ -168,6 +168,43 @@ export async function deleteUser(userId: number): Promise<ApiResponse<null>> {
 }
 
 /**
+ * Pastas
+ */
+interface Folder {
+  id: string;
+  name: string;
+  path: string;
+}
+
+export async function getFolders(): Promise<ApiResponse<{ folders: Folder[] }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/folders.php`, {
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('Erro na resposta de pastas:', data);
+      // Retornar pelo menos "Todas" em caso de erro
+      return { folders: [{ id: '*', name: 'Todas', path: '*' }] };
+    }
+
+    // Verificar se data.folders existe
+    if (data.folders && Array.isArray(data.folders)) {
+      return { folders: data.folders };
+    }
+    
+    // Se não tiver pastas, retornar pelo menos "Todas"
+    return { folders: [{ id: '*', name: 'Todas', path: '*' }] };
+  } catch (error: any) {
+    console.error('Erro ao buscar pastas:', error);
+    // Em caso de erro, retornar pelo menos "Todas"
+    return { folders: [{ id: '*', name: 'Todas', path: '*' }] };
+  }
+}
+
+/**
  * Arquivos
  */
 export async function getFiles(folder: string = '*'): Promise<ApiResponse<FileItem[]>> {
@@ -188,20 +225,11 @@ export async function getFiles(folder: string = '*'): Promise<ApiResponse<FileIt
   }
 }
 
-export async function uploadFile(file: File, folder: string, metadata?: {
-  animal_name?: string;
-  animal_id?: string;
-  tags?: string[];
-}): Promise<ApiResponse<FileItem>> {
+export async function uploadFile(file: File, folder: string): Promise<ApiResponse<FileItem>> {
   try {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
-    if (metadata) {
-      if (metadata.animal_name) formData.append('animal_name', metadata.animal_name);
-      if (metadata.animal_id) formData.append('animal_id', metadata.animal_id);
-      if (metadata.tags) formData.append('tags', JSON.stringify(metadata.tags));
-    }
 
     const response = await fetch(`${API_BASE_URL}/files.php`, {
       method: 'POST',
@@ -240,5 +268,31 @@ export async function deleteFile(fileId: string, folder: string): Promise<ApiRes
   }
 }
 
-export type { User, FileItem, ApiResponse };
+/**
+ * Criar Subpasta
+ */
+export async function createFolder(folderName: string, parentFolder: string): Promise<ApiResponse<{ folder: Folder }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/create-folder.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ folderName, parentFolder }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao criar pasta');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao criar pasta' };
+  }
+}
+
+export type { User, FileItem, ApiResponse, Folder };
 

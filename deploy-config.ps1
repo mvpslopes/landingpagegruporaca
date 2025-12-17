@@ -6,7 +6,7 @@
 $env:FTP_HOST = "ftp.seusite.com"  # Ex: ftp.gruporaca.com.br
 $env:FTP_USER = "seu_usuario"      # Seu usuário FTP
 $env:FTP_PASS = "sua_senha"        # Sua senha FTP
-$env:FTP_PATH = "/mvpslopes/landingpagegruporaca"     # Caminho no servidor
+$env:FTP_PATH = "/public_html"     # Caminho no servidor (raiz do domínio)
 
 # Para usar, execute:
 # . .\deploy-config.ps1

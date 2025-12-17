@@ -106,7 +106,17 @@ try {
         }
     }
     
+    # Upload da pasta dist (frontend)
+    Write-Host "📤 Enviando arquivos do frontend (dist)..." -ForegroundColor Cyan
     Upload-Folder -LocalPath "dist" -RemotePath $FtpPath -FtpHost $FtpHost -FtpUser $FtpUser -FtpPass $FtpPass
+    
+    # Upload da pasta api (backend PHP)
+    if (Test-Path "api") {
+        Write-Host "📤 Enviando arquivos da API (api)..." -ForegroundColor Cyan
+        Upload-Folder -LocalPath "api" -RemotePath "$FtpPath/api" -FtpHost $FtpHost -FtpUser $FtpUser -FtpPass $FtpPass
+    } else {
+        Write-Host "⚠️  Pasta 'api' não encontrada, pulando upload da API" -ForegroundColor Yellow
+    }
     
     Write-Host "✅ Upload concluído com sucesso!" -ForegroundColor Green
     Write-Host ""
@@ -121,6 +131,7 @@ try {
     Write-Host "   3. Usuário: $FtpUser" -ForegroundColor Yellow
     Write-Host "   4. Navegue até: $FtpPath" -ForegroundColor Yellow
     Write-Host "   5. Faça upload de TODOS os arquivos da pasta 'dist'" -ForegroundColor Yellow
+    Write-Host "   6. Faça upload da pasta 'api' para $FtpPath/api" -ForegroundColor Yellow
     exit 1
 } finally {
     # Limpar arquivo temporário

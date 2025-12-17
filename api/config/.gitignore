@@ -1,0 +1,8 @@
+# Ignorar arquivos de credenciais do Google Drive
+*.json
+!drive_config.php
+
+# Manter o drive_config.php mas proteger as credenciais
+grupo-raca-drive-credentials.json
+tidal-triumph-*.json
+

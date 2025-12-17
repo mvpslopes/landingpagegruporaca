@@ -24,8 +24,8 @@ const copyHtaccess = () => {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), copyHtaccess()],
-  // Caminho base: projeto roda em subpasta
-  base: '/mvpslopes/landingpagegruporaca/',
+  // Caminho base: projeto roda na raiz do domínio
+  base: '/',
   server: {
     // Porta padrão do Vite (5173) ou próxima disponível
     proxy: {

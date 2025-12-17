@@ -119,6 +119,7 @@ const assessoriaGrupoRacaList = [
   'JOÃO PAULO',
   'JOEL',
   'JUNINHO',
+  'JÚNIOR MARTINS',
   'KAIKE',
   'KAUAN',
   'LEONE',
@@ -145,7 +146,6 @@ const assessoria = [
   'ANDRÉ',
   'DINHO',
   'DUDU IDUALTE',
-  'JÚNIOR MARTINS',
   'JOANN ALVES',
   'MARCELO BERNARDO',
   'TEÓFILO ALMEIDA'
