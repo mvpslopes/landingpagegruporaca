@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   LogIn, X, Search, Upload, Eye, Download, Trash2, 
-  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft
+  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import Loading from './Loading';
 import Modal from './Modal';
@@ -26,11 +26,20 @@ export default function DatabasePage() {
   const [loginError, setLoginError] = useState('');
   const [error, setError] = useState('');
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [oauthStatus, setOAuthStatus] = useState<{ hasToken: boolean; canAuthorize: boolean; tokenInfo?: any } | null>(null);
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
 
   useEffect(() => {
     // Verificar autenticação ao carregar
     checkAuth();
   }, []);
+
+  // Verificar status OAuth quando usuário estiver autenticado
+  useEffect(() => {
+    if (user && (user.role === 'root' || user.role === 'admin')) {
+      checkOAuthStatus();
+    }
+  }, [user]);
 
   // Ajustar pasta inicial e carregar dados quando usuário é carregado
   useEffect(() => {

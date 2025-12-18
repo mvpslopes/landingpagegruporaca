@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 export default function Hero() {
 
   return (
-    <section className="relative min-h-[85vh] sm:min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-black via-gray-900 to-black text-white">
+    <section className="relative min-h-[85vh] sm:min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-black via-gray-900 to-black text-white bg-gradient-animated">
       {/* Background com overlay mais sutil para destacar a imagem */}
       <div className="absolute inset-0 bg-cover bg-center brightness-110 saturate-110" style={{ backgroundImage: "url('/Fundo Cavalo preto.jpg')", transform: 'scaleX(-1)' }}></div>
       <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/30 to-black/50"></div>
@@ -82,7 +82,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3 md:gap-4 pt-2">
               <a
                 href="#leiloes"
-                className="group bg-white text-black px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105 text-xs sm:text-sm md:text-base w-full sm:w-auto"
+                className="group bg-white text-black px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105 text-xs sm:text-sm md:text-base w-full sm:w-auto button-shine ripple-effect"
               >
                 Agenda de Leilões
                 <ChevronRight size={16} className="sm:w-4 sm:h-4 md:w-5 md:h-5 group-hover:translate-x-1 transition-transform" />
@@ -91,7 +91,7 @@ export default function Hero() {
                 href="https://gruporaca.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group bg-transparent border-2 border-white/30 text-white px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-white/10 hover:border-white/50 transition-all duration-300 backdrop-blur-sm hover:scale-105 text-xs sm:text-sm md:text-base text-center w-full sm:w-auto"
+                className="group bg-transparent border-2 border-white/30 text-white px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-white/10 hover:border-white/50 transition-all duration-300 backdrop-blur-sm hover:scale-105 text-xs sm:text-sm md:text-base text-center w-full sm:w-auto button-shine ripple-effect glass-effect"
               >
                 Site Oficial
               </a>

@@ -294,5 +294,72 @@ export async function createFolder(folderName: string, parentFolder: string): Pr
   }
 }
 
+/**
+ * OAuth Google Drive
+ */
+export async function checkOAuthStatus(): Promise<ApiResponse<{ hasToken: boolean; tokenInfo?: any; canAuthorize: boolean }>> {
+  try {
+    const formData = new FormData();
+    formData.append('action', 'check');
+
+    const response = await fetch(`${API_BASE_URL}/oauth-drive.php`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao verificar status OAuth');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao verificar status OAuth' };
+  }
+}
+
+export async function getOAuthUrl(): Promise<ApiResponse<{ authUrl: string }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/oauth-drive.php`, {
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao obter URL de autorização');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao obter URL de autorização' };
+  }
+}
+
+export async function revokeOAuth(): Promise<ApiResponse<null>> {
+  try {
+    const formData = new FormData();
+    formData.append('action', 'revoke');
+
+    const response = await fetch(`${API_BASE_URL}/oauth-drive.php`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao revogar autorização');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao revogar autorização' };
+  }
+}
+
 export type { User, FileItem, ApiResponse, Folder };
 

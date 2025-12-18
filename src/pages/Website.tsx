@@ -124,11 +124,13 @@ export default function Website({ onBack }: WebsiteProps) {
                 <ArrowLeft size={16} className="sm:w-5 sm:h-5" />
                 <span className="text-xs sm:text-sm hidden sm:inline">Voltar</span>
               </button>
-              <img 
-                src="/logo.png" 
-                alt="Grupo Raça" 
-                className="h-8 sm:h-10 md:h-12 w-auto"
-              />
+              <div className="logo-shine">
+                <img 
+                  src="/logo.png" 
+                  alt="Grupo Raça" 
+                  className="h-8 sm:h-10 md:h-12 w-auto"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide -mr-2 sm:-mr-0">
               {sections.map(section => (

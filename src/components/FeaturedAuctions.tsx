@@ -1,4 +1,5 @@
 import { Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 // Função auxiliar para criar datas de dezembro do ano atual
 function createDecemberDate(day: number): Date {
@@ -71,42 +72,48 @@ function getAuctionStatus(startDate: Date, endDate: Date): string {
 }
 
 export default function FeaturedAuctions() {
+  const { ref: titleRef, isVisible: titleVisible } = useScrollReveal({ threshold: 0.2 });
+  const { ref: cardsRef, isVisible: cardsVisible } = useScrollReveal({ threshold: 0.1 });
+
   return (
     <section id="leiloes" className="py-12 sm:py-16 md:py-20 lg:py-24 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 overflow-x-hidden">
-        <div className="text-center mb-12 sm:mb-16 md:mb-20">
+        <div 
+          ref={titleRef}
+          className={`text-center mb-12 sm:mb-16 md:mb-20 scroll-reveal scroll-reveal-up ${titleVisible ? 'revealed' : ''}`}
+        >
           <div className="inline-block mb-4">
             <span className="px-3 sm:px-4 py-2 bg-black/5 rounded-full text-xs sm:text-sm font-semibold text-gray-700">
               CONFIRA NOSSA AGENDA
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-black mb-3 sm:mb-4 md:mb-6 px-2 leading-tight">
-            LEILÕES EM <span 
-              className="bg-clip-text text-transparent"
-              style={{
-                backgroundImage: 'linear-gradient(to right, #000000, #808080, #000000)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}
-            >DESTAQUE</span>
+            LEILÕES EM <span className="gradient-text">DESTAQUE</span>
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto px-2">
             Acompanhe aqui os principais leilões de cavalos de elite do Brasil.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
+        <div 
+          ref={cardsRef}
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 scroll-reveal scroll-reveal-up ${cardsVisible ? 'revealed' : ''}`}
+        >
           {auctions.map((auction, index) => (
             <div
               key={auction.id}
-              className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-100 hover:border-gray-200"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-100 hover:border-gray-200 card-hover"
+              style={{ 
+                animationDelay: `${index * 100}ms`,
+                transitionDelay: `${index * 50}ms`
+              }}
             >
-              <div className="relative h-72 overflow-hidden bg-gray-100">
+              <div className="relative h-72 overflow-hidden bg-gray-100 group">
+                <div className="absolute inset-0 shimmer-effect opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <img
                   src={auction.image}
                   alt={auction.title}
-                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700"
                   style={{ objectFit: 'contain' }}
                 />
                 <div className="absolute top-6 right-6 z-20">
@@ -146,7 +153,7 @@ export default function FeaturedAuctions() {
                   )}
                 </div>
 
-                <button className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02]">
+                <button className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02] button-shine ripple-effect">
                   Ver Detalhes
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </button>

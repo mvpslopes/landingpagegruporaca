@@ -18,6 +18,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showDatabase, setShowDatabase] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -27,6 +28,13 @@ function App() {
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+
+    // Animação de carregamento inicial com a logo
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 2400);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleLoginSuccess = async (userData: any) => {
@@ -46,6 +54,11 @@ function App() {
     localStorage.removeItem('gruporaca_user');
     setIsLoggingOut(false);
   };
+
+  // Tela de carregamento inicial do site com a logo ao centro
+  if (initialLoading) {
+    return <Loading variant="splash" />;
+  }
 
   // Se mostrar banco de dados, exibir página separada
   if (showDatabase) {
@@ -68,11 +81,13 @@ function App() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 sm:h-18 md:h-20">
             <div className="flex items-center">
-              <img 
-                src="/logo.png" 
-                alt="Grupo Raça" 
-                className="h-8 sm:h-10 md:h-12 w-auto"
-              />
+              <div className="logo-shine">
+                <img 
+                  src="/logo.png" 
+                  alt="Grupo Raça" 
+                  className="h-8 sm:h-10 md:h-12 w-auto"
+                />
+              </div>
             </div>
             
             {/* Menu Desktop - sempre visível */}

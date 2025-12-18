@@ -1,14 +1,20 @@
 import { ArrowRight, Calendar } from 'lucide-react';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export default function CTA() {
+  const { ref, isVisible } = useScrollReveal({ threshold: 0.2 });
+
   return (
-    <section className="py-20 bg-black relative overflow-hidden">
+    <section className="py-20 bg-black relative overflow-hidden bg-gradient-animated">
       {/* Elementos decorativos */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl opacity-50"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl opacity-50"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl opacity-50 float-animation"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl opacity-50 float-animation" style={{ animationDelay: '1.5s' }}></div>
       
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
-        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-12 md:p-16 text-center">
+        <div 
+          ref={ref}
+          className={`bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-12 md:p-16 text-center glass-effect scroll-reveal scroll-reveal-scale ${isVisible ? 'revealed' : ''}`}
+        >
           <div className="max-w-3xl mx-auto space-y-8">
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6">
               Prepare seu lance!
@@ -30,7 +36,7 @@ export default function CTA() {
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <a
                 href="#leiloes"
-                className="group bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:scale-105"
+                className="group bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:scale-105 button-shine ripple-effect"
               >
                 Leilões NO AR
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -39,7 +45,7 @@ export default function CTA() {
                 href="https://gruporaca.com/cadastro"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105"
+                className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105 button-shine ripple-effect"
               >
                 Cadastre-se
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

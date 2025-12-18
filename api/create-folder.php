@@ -9,8 +9,8 @@ require_once 'permissions_db.php';
 
 $user = requireAuth();
 
-// Função para converter pasta do usuário para caminho do Google Drive
-function convertUserFolderToDrivePath($user, $folder) {
+// Função para converter pasta do usuário para caminho do Backblaze B2
+function convertUserFolderToB2Path($user, $folder) {
     // Se for ROOT ou ADMIN, pode acessar qualquer pasta
     if ($user['role'] === 'root' || $user['role'] === 'admin') {
         if ($folder === '*') {
@@ -35,14 +35,14 @@ function convertUserFolderToDrivePath($user, $folder) {
     return '*';
 }
 
-// Tentar carregar DriveService
-$driveService = null;
+// Tentar carregar B2Service
+$b2Service = null;
 try {
-    require_once __DIR__ . '/drive_service.php';
-    $driveService = new DriveService();
+    require_once __DIR__ . '/b2_service.php';
+    $b2Service = new B2Service();
 } catch (Exception $e) {
-    error_log('Erro ao carregar DriveService: ' . $e->getMessage());
-    jsonError('Google Drive não configurado', 503);
+    error_log('Erro ao carregar B2Service: ' . $e->getMessage());
+    jsonError('Backblaze B2 não configurado', 503);
 }
 
 // POST: Criar subpasta
@@ -71,37 +71,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             jsonError('Sem acesso a esta pasta', 403);
         }
         
-        // Converter pasta do usuário para caminho do Drive
-        $driveFolder = convertUserFolderToDrivePath($user, $parentFolder);
+        // Converter pasta do usuário para caminho do Backblaze B2
+        $b2Folder = convertUserFolderToB2Path($user, $parentFolder);
         
-        // Obter ID da pasta pai
-        $parentFolderId = null;
-        if ($driveFolder === '*') {
-            $parentFolderId = $driveService->getConfig()['root_folder_id'];
-        } else {
-            $parentFolderId = $driveService->ensureFolder($driveFolder);
-        }
-        
-        // Verificar se a pasta já existe
-        $existingFolderId = $driveService->getFolderIdByName($folderName, $parentFolderId);
-        if ($existingFolderId) {
-            jsonError('Uma pasta com este nome já existe', 409);
-        }
-        
-        // Criar a pasta
-        $newFolderId = $driveService->createFolder($folderName, $parentFolderId);
+        // Criar a pasta usando B2Service
+        $result = $b2Service->createFolder($folderName, $b2Folder);
         
         // Construir o caminho completo da nova pasta
-        $newFolderPath = $driveFolder === '*' 
+        $newFolderPath = $b2Folder === '*' 
             ? $folderName 
-            : $driveFolder . '/' . $folderName;
+            : $b2Folder . '/' . $folderName;
         
         jsonResponse([
             'success' => true,
             'message' => 'Subpasta criada com sucesso',
             'folder' => [
-                'id' => $newFolderId,
-                'name' => $folderName,
+                'id' => $result['id'],
+                'name' => $result['name'],
                 'path' => $newFolderPath
             ]
         ]);

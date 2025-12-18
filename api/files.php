@@ -1,7 +1,7 @@
 <?php
 /**
  * Gerenciamento de Arquivos
- * Integrado com Google Drive
+ * Integrado com Backblaze B2 Cloud Storage
  */
 
 require_once 'config.php';
@@ -9,20 +9,14 @@ require_once 'permissions_db.php';
 
 $user = requireAuth();
 
-// Tentar usar OAuth primeiro (upload centralizado)
-$oauthToken = null;
-if (isset($_SESSION['oauth_tokens']['central'])) {
-    $oauthToken = $_SESSION['oauth_tokens']['central'];
-}
-
-// Tentar carregar DriveService
-$driveService = null;
+// Tentar carregar B2Service
+$b2Service = null;
 try {
-    require_once __DIR__ . '/drive_service.php';
-    $driveService = new DriveService($oauthToken);
+    require_once __DIR__ . '/b2_service.php';
+    $b2Service = new B2Service();
 } catch (Exception $e) {
-    error_log('Erro ao carregar DriveService: ' . $e->getMessage());
-    // Continuar sem DriveService (modo simulado)
+    error_log('Erro ao carregar B2Service: ' . $e->getMessage());
+    // Continuar sem B2Service (modo simulado)
 }
 
 // GET: Listar arquivos
@@ -34,33 +28,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         jsonError('Sem acesso a esta pasta', 403);
     }
     
-    // Se DriveService estiver disponível, usar Google Drive
-    if ($driveService) {
+    // Se B2Service estiver disponível, usar Backblaze B2
+    if ($b2Service) {
         try {
-            // Converter pasta do usuário para caminho do Drive
-            $driveFolder = convertUserFolderToDrivePath($user, $folder);
-            $files = $driveService->listFiles($driveFolder, true);
+            // Converter pasta do usuário para caminho do B2
+            $b2Folder = convertUserFolderToB2Path($user, $folder);
+            $files = $b2Service->listFiles($b2Folder, true);
             
             jsonResponse([
                 'files' => $files,
                 'folder' => $folder,
-                'driveFolder' => $driveFolder
+                'b2Folder' => $b2Folder
             ]);
         } catch (Exception $e) {
-            error_log('Erro ao listar arquivos do Drive: ' . $e->getMessage());
+            error_log('Erro ao listar arquivos do B2: ' . $e->getMessage());
             jsonResponse([
                 'files' => [],
                 'folder' => $folder,
-                'error' => 'Erro ao conectar com Google Drive',
+                'error' => 'Erro ao conectar com Backblaze B2',
                 'message' => $e->getMessage()
             ]);
         }
     } else {
-        // Modo simulado (quando DriveService não está disponível)
+        // Modo simulado (quando B2Service não está disponível)
         jsonResponse([
             'files' => [],
             'folder' => $folder,
-            'message' => 'Google Drive não configurado. Instale a biblioteca: composer require google/apiclient'
+            'message' => 'Backblaze B2 não configurado. Configure as credenciais no arquivo config/b2_config.php'
         ]);
     }
 }
@@ -84,27 +78,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         jsonError('Nenhum arquivo enviado ou erro no upload', 400);
     }
     
-    // Tentar usar OAuth primeiro (upload centralizado)
-    $oauthToken = null;
-    if (isset($_SESSION['oauth_tokens']['central'])) {
-        $oauthToken = $_SESSION['oauth_tokens']['central'];
-    }
-    
-    // Se DriveService estiver disponível, fazer upload real
+    // Se B2Service estiver disponível, fazer upload real
     try {
-        // Criar DriveService com OAuth se disponível, senão usar Service Account
-        require_once __DIR__ . '/drive_service.php';
-        $driveServiceInstance = new DriveService($oauthToken);
+        // Criar B2Service
+        require_once __DIR__ . '/b2_service.php';
+        $b2ServiceInstance = new B2Service();
         
         $uploadedFile = $_FILES['file'];
         $fileName = $uploadedFile['name'];
         $tmpPath = $uploadedFile['tmp_name'];
         
-        // Converter pasta do usuário para caminho do Drive
-        $driveFolder = convertUserFolderToDrivePath($user, $folder);
+        // Converter pasta do usuário para caminho do B2
+        $b2Folder = convertUserFolderToB2Path($user, $folder);
         
         // Fazer upload
-        $result = $driveServiceInstance->uploadFile($tmpPath, $fileName, $driveFolder);
+        $result = $b2ServiceInstance->uploadFile($tmpPath, $fileName, $b2Folder);
         
         jsonResponse([
             'success' => true,
@@ -114,13 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     } catch (Exception $e) {
         error_log('Erro ao fazer upload: ' . $e->getMessage());
-        
-        // Se erro for de autenticação OAuth, sugerir reautorização
-        if (strpos($e->getMessage(), 'OAuth') !== false || strpos($e->getMessage(), 'token') !== false) {
-            jsonError('Erro de autenticação. Reautorize o acesso ao Google Drive nas configurações.', 401);
-        } else {
-            jsonError('Erro ao fazer upload: ' . $e->getMessage(), 500);
-        }
+        jsonError('Erro ao fazer upload: ' . $e->getMessage(), 500);
     }
 }
 
@@ -143,10 +125,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         jsonError('Sem acesso a esta pasta', 403);
     }
     
-    // Se DriveService estiver disponível, deletar do Drive
-    if ($driveService) {
+    // Se B2Service estiver disponível, deletar do B2
+    if ($b2Service) {
         try {
-            $driveService->deleteFile($fileId);
+            // No B2, precisamos do fileName também para deletar
+            $fileName = $_GET['fileName'] ?? null;
+            if (!$fileName) {
+                jsonError('Nome do arquivo é obrigatório para deletar', 400);
+            }
+            $b2Service->deleteFile($fileId, $fileName);
             jsonResponse([
                 'success' => true,
                 'message' => 'Arquivo deletado com sucesso'
@@ -156,14 +143,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
             jsonError('Erro ao deletar arquivo: ' . $e->getMessage(), 500);
         }
     } else {
-        jsonError('Google Drive não configurado. Instale a biblioteca: composer require google/apiclient', 503);
+        jsonError('Backblaze B2 não configurado. Configure as credenciais no arquivo config/b2_config.php', 503);
     }
 }
 
 /**
- * Converter pasta do usuário para caminho do Google Drive
+ * Converter pasta do usuário para caminho do Backblaze B2
  */
-function convertUserFolderToDrivePath($user, $folder) {
+function convertUserFolderToB2Path($user, $folder) {
     // Se for ROOT ou ADMIN, pode acessar qualquer pasta
     if ($user['role'] === 'root' || $user['role'] === 'admin') {
         if ($folder === '*') {
