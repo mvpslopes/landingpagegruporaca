@@ -50,6 +50,14 @@ function getDBConnection() {
             ];
             
             $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
+            
+            // Configurar fuso horário do MySQL para Brasília
+            try {
+                $conn->exec("SET time_zone = '-03:00'");
+            } catch (PDOException $e) {
+                // Se não conseguir configurar timezone, continua sem erro
+                error_log("Aviso: Não foi possível configurar timezone do MySQL: " . $e->getMessage());
+            }
         } catch (PDOException $e) {
             error_log("Erro de conexão com banco de dados: " . $e->getMessage());
             http_response_code(500);

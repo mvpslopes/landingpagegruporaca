@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   LogIn, X, Search, Upload, Eye, Download, Trash2, 
-  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, AlertCircle, CheckCircle2
+  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, AlertCircle, CheckCircle2, CheckCircle
 } from 'lucide-react';
 import Loading from './Loading';
 import Modal from './Modal';
@@ -28,18 +28,46 @@ export default function DatabasePage() {
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [oauthStatus, setOAuthStatus] = useState<{ hasToken: boolean; canAuthorize: boolean; tokenInfo?: any } | null>(null);
   const [showOAuthModal, setShowOAuthModal] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [loginVisible, setLoginVisible] = useState(false);
 
   useEffect(() => {
     // Verificar autenticação ao carregar
     checkAuth();
+    // Animação de entrada do login
+    if (showLogin) {
+      setTimeout(() => setLoginVisible(true), 100);
+    }
   }, []);
+
+  // Função para verificar status OAuth
+  const checkOAuthStatus = useCallback(async () => {
+    if (!user || (user.role !== 'root' && user.role !== 'admin')) {
+      return;
+    }
+
+    try {
+      const response = await api.checkOAuthStatus();
+      if (response.data) {
+        setOAuthStatus(response.data);
+      } else if (response.error) {
+        // Se houver erro, definir status padrão
+        setOAuthStatus({ hasToken: false, canAuthorize: true });
+      }
+    } catch (err) {
+      console.error('Erro ao verificar status OAuth:', err);
+      // Definir status padrão em caso de erro
+      setOAuthStatus({ hasToken: false, canAuthorize: true });
+    }
+  }, [user]);
 
   // Verificar status OAuth quando usuário estiver autenticado
   useEffect(() => {
     if (user && (user.role === 'root' || user.role === 'admin')) {
       checkOAuthStatus();
     }
-  }, [user]);
+  }, [user, checkOAuthStatus]);
 
   // Ajustar pasta inicial e carregar dados quando usuário é carregado
   useEffect(() => {
@@ -221,38 +249,69 @@ export default function DatabasePage() {
     e.preventDefault();
     setLoginError('');
     setLoading(true);
+    setLoginSuccess(false);
 
     try {
-      const response = await api.login(loginEmail, loginPassword);
+      // Delay mínimo para feedback visual (800ms)
+      const [response] = await Promise.all([
+        api.login(loginEmail, loginPassword),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]);
       
       if (response.user && !response.error) {
+        // Mostrar animação de sucesso
+        setLoginSuccess(true);
+        setLoading(false);
+        
+        // Aguardar um pouco antes de continuar (animação de sucesso)
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
         setUser(response.user);
         setIsAuthenticated(true);
-        setShowLogin(false);
         localStorage.setItem('database_user', JSON.stringify(response.user));
+        
+        // Fade out do login
+        setLoginVisible(false);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        setShowLogin(false);
         await loadFiles();
       } else {
         setLoginError(response.error || 'Email ou senha incorretos');
+        setLoading(false);
       }
     } catch (err: any) {
       setLoginError(err.message || 'Erro ao fazer login. Tente novamente.');
-    } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
+    if (!confirm('Tem certeza que deseja sair?')) {
+      return;
+    }
+
+    setIsLoggingOut(true);
     setLoading(true);
+    
     try {
-      await api.logout();
+      // Delay para feedback visual
+      await Promise.all([
+        api.logout(),
+        new Promise(resolve => setTimeout(resolve, 500))
+      ]);
     } catch (err) {
       console.error('Erro ao fazer logout:', err);
     } finally {
+      // Fade out antes de limpar
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       setIsAuthenticated(false);
       setUser(null);
-      setShowLogin(true);
       localStorage.removeItem('database_user');
       setLoading(false);
+      setIsLoggingOut(false);
+      
       // Redirecionar para a página principal
       window.location.href = '/';
     }
@@ -411,7 +470,11 @@ export default function DatabasePage() {
       <>
         {loading && <Loading message="Autenticando..." />}
         <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative">
+          <div 
+            className={`bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative transition-all duration-300 ${
+              loginVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
+            }`}
+          >
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-gradient-to-br from-gray-800 to-black rounded-full flex items-center justify-center mx-auto mb-4">
                 <Database size={32} className="text-white" />
@@ -459,11 +522,23 @@ export default function DatabasePage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || loginSuccess}
+                className={`w-full text-white py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                  loginSuccess 
+                    ? 'bg-green-600' 
+                    : 'bg-black hover:bg-gray-800 disabled:opacity-50'
+                }`}
               >
-                {loading ? (
-                  'Entrando...'
+                {loginSuccess ? (
+                  <>
+                    <CheckCircle size={20} />
+                    Login realizado com sucesso!
+                  </>
+                ) : loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Autenticando...
+                  </>
                 ) : (
                   <>
                     <LogIn size={20} />
@@ -471,15 +546,16 @@ export default function DatabasePage() {
                   </>
                 )}
               </button>
-            </form>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 font-semibold mb-2">Sistema de Banco de Dados</p>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p>Entre com seu email e senha cadastrados</p>
-                <p className="mt-2 text-gray-400">Senha padrão de teste: <strong>password</strong></p>
-              </div>
-            </div>
+              <button
+                type="button"
+                onClick={() => window.location.href = '/'}
+                disabled={loading || loginSuccess}
+                className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+            </form>
           </div>
         </div>
       </>
@@ -487,7 +563,17 @@ export default function DatabasePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      {isLoggingOut && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 border-4 border-gray-300 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
+            <h3 className="text-xl font-bold text-black mb-2">Saindo do sistema...</h3>
+            <p className="text-gray-600">Aguarde um momento</p>
+          </div>
+        </div>
+      )}
+      <div className={`min-h-screen bg-gray-50 transition-opacity duration-300 ${isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -522,10 +608,20 @@ export default function DatabasePage() {
               )}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium"
+                disabled={isLoggingOut}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogOut size={16} />
-                Sair
+                {isLoggingOut ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+                    Saindo...
+                  </>
+                ) : (
+                  <>
+                    <LogOut size={16} />
+                    Sair
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -533,33 +629,35 @@ export default function DatabasePage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 md:py-8">
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 md:p-6 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-2xl font-bold text-black">Galeria de Arquivos</h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <h2 className="text-xl md:text-2xl font-bold text-black">Galeria de Arquivos</h2>
+                <p className="text-xs md:text-sm text-gray-600 mt-1">
                   Total: {files.length} arquivo{files.length !== 1 ? 's' : ''} cadastrado{files.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {canUpload && (
                   <>
                     <button 
                       onClick={() => setShowCreateFolderModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium"
+                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
                       title="Criar subpasta"
                     >
-                      <FolderPlus size={16} />
-                      Nova Pasta
+                      <FolderPlus size={18} />
+                      <span className="hidden sm:inline">Nova Pasta</span>
+                      <span className="sm:hidden">Pasta</span>
                     </button>
                     <button 
                       onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium"
+                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
                     >
-                      <Upload size={16} />
-                      Upload Arquivos
+                      <Upload size={18} />
+                      <span className="hidden sm:inline">Upload Arquivos</span>
+                      <span className="sm:hidden">Upload</span>
                     </button>
                   </>
                 )}
@@ -610,7 +708,7 @@ export default function DatabasePage() {
             </div>
           </div>
           
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {/* Seletor de Pastas para ROOT/ADMIN */}
             {(() => {
               const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin';
@@ -636,7 +734,7 @@ export default function DatabasePage() {
                       console.log('Pasta alterada para:', e.target.value);
                       setCurrentFolder(e.target.value);
                     }}
-                    className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white"
+                    className="w-full md:w-auto px-4 py-3 md:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white text-base md:text-sm touch-manipulation"
                   >
                     {folders.length > 0 ? (
                       folders.map((folder) => (
@@ -738,33 +836,65 @@ export default function DatabasePage() {
                             <ImageIcon size={48} className="text-gray-400" />
                           </div>
                         )}
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 opacity-0 md:group-hover:opacity-100 transition-opacity md:opacity-0">
                           <div className="flex gap-2">
                             {file.url && (
                               <a 
                                 href={file.url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors"
+                                className="p-2.5 md:p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
-                                <Eye size={16} className="text-black" />
+                                <Eye size={18} className="text-black md:w-4 md:h-4" />
                               </a>
                             )}
                             {file.url && (
                               <a 
                                 href={file.url} 
                                 download
-                                className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors"
+                                className="p-2.5 md:p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
-                                <Download size={16} className="text-black" />
+                                <Download size={18} className="text-black md:w-4 md:h-4" />
                               </a>
                             )}
                             {canDelete && (
                               <button 
                                 onClick={() => handleDeleteFile(file.id, file.folder)}
-                                className="p-2 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors"
+                                className="p-2.5 md:p-2 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
-                                <Trash2 size={16} className="text-white" />
+                                <Trash2 size={18} className="text-white md:w-4 md:h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {/* Botões sempre visíveis no mobile */}
+                        <div className="md:hidden absolute top-2 right-2">
+                          <div className="flex gap-2">
+                            {file.url && (
+                              <a 
+                                href={file.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-2.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              >
+                                <Eye size={18} className="text-black" />
+                              </a>
+                            )}
+                            {file.url && (
+                              <a 
+                                href={file.url} 
+                                download
+                                className="p-2.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              >
+                                <Download size={18} className="text-black" />
+                              </a>
+                            )}
+                            {canDelete && (
+                              <button 
+                                onClick={() => handleDeleteFile(file.id, file.folder)}
+                                className="p-2.5 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              >
+                                <Trash2 size={18} className="text-white" />
                               </button>
                             )}
                           </div>
@@ -940,7 +1070,8 @@ export default function DatabasePage() {
           </div>
         </form>
       </Modal>
-    </div>
+      </div>
+    </>
   );
 }
 

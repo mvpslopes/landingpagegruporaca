@@ -1,4 +1,6 @@
 import { MessageCircle } from 'lucide-react';
+import { trackClick } from '../hooks/useTracking';
+import { trackWhatsAppClick } from '../utils/analytics';
 
 export default function WhatsAppButton() {
   const whatsappNumber = '5521981972847'; // Ariane Andrade
@@ -9,6 +11,11 @@ export default function WhatsAppButton() {
       href={`https://wa.me/${whatsappNumber}?text=${message}`}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        trackClick('button', 'whatsapp', 'Fale conosco no WhatsApp', Math.floor(e.clientX - rect.left), Math.floor(e.clientY - rect.top));
+        trackWhatsAppClick('5521981972847');
+      }}
       className="fixed bottom-6 right-6 z-50 group"
       aria-label="Fale conosco no WhatsApp"
     >

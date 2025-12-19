@@ -1,5 +1,7 @@
 import { ArrowRight, Calendar } from 'lucide-react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
+import { trackClick } from '../hooks/useTracking';
+import { trackButtonClick } from '../utils/analytics';
 
 export default function CTA() {
   const { ref, isVisible } = useScrollReveal({ threshold: 0.2 });
@@ -36,6 +38,11 @@ export default function CTA() {
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <a
                 href="#leiloes"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  trackClick('button', 'leiloes-no-ar', 'Leilões NO AR', Math.floor(e.clientX - rect.left), Math.floor(e.clientY - rect.top));
+                  trackButtonClick('Leilões NO AR', 'cta');
+                }}
                 className="group bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-green-600/30 hover:shadow-xl hover:shadow-green-600/40 hover:scale-105 button-shine ripple-effect"
               >
                 Leilões NO AR
@@ -45,6 +52,12 @@ export default function CTA() {
                 href="https://gruporaca.com/cadastro"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  trackClick('button', 'cadastre-se', 'Cadastre-se', Math.floor(e.clientX - rect.left), Math.floor(e.clientY - rect.top));
+                  trackButtonClick('Cadastre-se', 'cta');
+                  trackConversion('cadastro_cta_click');
+                }}
                 className="group bg-white text-black px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105 button-shine ripple-effect"
               >
                 Cadastre-se

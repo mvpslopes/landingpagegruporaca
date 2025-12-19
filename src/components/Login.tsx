@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { LogIn, X } from 'lucide-react';
-import { signIn } from '../lib/supabase';
+import { useState, useEffect } from 'react';
+import { LogIn, X, CheckCircle } from 'lucide-react';
+import { login } from '../lib/api';
 import Loading from './Loading';
 
 interface LoginProps {
@@ -13,6 +13,13 @@ export default function Login({ onClose, onSuccess }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Animação de entrada
+    setIsVisible(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,32 +27,76 @@ export default function Login({ onClose, onSuccess }: LoginProps) {
     setLoading(true);
 
     try {
-      // Simular delay de autenticação
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Delay mínimo para feedback visual (800ms)
+      const [response] = await Promise.all([
+        login(email, password),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]);
       
-      const { data, error: signInError } = await signIn(email, password);
-      
-      if (signInError || !data.user) {
-        setError(signInError?.message || 'Email ou senha incorretos');
+      if (response.error) {
+        setError(response.error);
         setLoading(false);
         return;
       }
 
-      onSuccess(data.user);
+      // A API retorna { success: true, user: {...} }
+      if (!response.user) {
+        setError('Email ou senha incorretos');
+        setLoading(false);
+        return;
+      }
+
+      // Verificar se o usuário tem permissão para acessar o sistema interno
+      // Apenas admin e root podem acessar
+      if (response.user.role !== 'admin' && response.user.role !== 'root') {
+        setError('Você não tem permissão de acesso habilitada. Apenas administradores podem acessar o sistema interno.');
+        setLoading(false);
+        return;
+      }
+
+      // Salvar usuário no localStorage
+      localStorage.setItem('gruporaca_user', JSON.stringify(response.user));
+      
+      // Mostrar animação de sucesso
+      setSuccess(true);
+      setLoading(false);
+      
+      // Aguardar um pouco antes de fechar (animação de sucesso)
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Fade out antes de fechar
+      setIsVisible(false);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      onSuccess(response.user);
       onClose();
-    } catch (err) {
-      setError('Erro ao fazer login. Tente novamente.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao fazer login. Tente novamente.');
       setLoading(false);
     }
+  };
+
+  const handleClose = async () => {
+    setIsVisible(false);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    onClose();
   };
 
   return (
     <>
       {loading && <Loading message="Autenticando..." />}
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative">
+      <div 
+        className={`fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${
+          isVisible ? 'bg-opacity-50 opacity-100' : 'bg-opacity-0 opacity-0'
+        }`}
+      >
+        <div 
+          className={`bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative transition-all duration-300 ${
+            isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
+          }`}
+        >
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X size={24} />
@@ -98,11 +149,23 @@ export default function Login({ onClose, onSuccess }: LoginProps) {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || success}
+            className={`w-full text-white py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+              success 
+                ? 'bg-green-600' 
+                : 'bg-black hover:bg-gray-800 disabled:opacity-50'
+            }`}
           >
-            {loading ? (
-              'Entrando...'
+            {success ? (
+              <>
+                <CheckCircle size={20} />
+                Login realizado com sucesso!
+              </>
+            ) : loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Autenticando...
+              </>
             ) : (
               <>
                 <LogIn size={20} />
@@ -110,15 +173,16 @@ export default function Login({ onClose, onSuccess }: LoginProps) {
               </>
             )}
           </button>
-        </form>
 
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 font-semibold mb-2">Usuários de teste:</p>
-          <div className="text-xs text-gray-500 space-y-1">
-            <p><strong>Admin:</strong> admin@gruporaca.com.br / admin123</p>
-            <p><strong>Teste:</strong> teste@gruporaca.com.br / teste123</p>
-          </div>
-        </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={loading || success}
+            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancelar
+          </button>
+        </form>
         </div>
       </div>
     </>

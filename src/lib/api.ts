@@ -361,5 +361,26 @@ export async function revokeOAuth(): Promise<ApiResponse<null>> {
   }
 }
 
+/**
+ * Estatísticas (apenas admin/root)
+ */
+export async function getStatistics(action: string, period: string = '7d'): Promise<ApiResponse<any>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/statistics.php?action=${action}&period=${period}`, {
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao buscar estatísticas');
+    }
+
+    return { data };
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao buscar estatísticas' };
+  }
+}
+
 export type { User, FileItem, ApiResponse, Folder };
 

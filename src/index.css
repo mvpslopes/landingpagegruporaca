@@ -2,6 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Animações personalizadas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Animações para cards de estatísticas */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out forwards;
+}
+
+/* Delay para animação em cascata */
+.animate-delay-100 {
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+.animate-delay-200 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.animate-delay-300 {
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+.animate-delay-400 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
+
 /* Animação de entrada suave */
 @keyframes fade-in {
   from {

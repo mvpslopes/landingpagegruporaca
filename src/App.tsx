@@ -12,6 +12,7 @@ import DatabasePage from './components/Database';
 import Loading from './components/Loading';
 import CTA from './components/CTA';
 import WhatsAppButton from './components/WhatsAppButton';
+import { useTracking } from './hooks/useTracking';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -22,11 +23,21 @@ function App() {
   const [showDatabase, setShowDatabase] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Inicializar tracking
+  useTracking();
+
   useEffect(() => {
     // Verificar se há usuário salvo no localStorage
     const savedUser = localStorage.getItem('gruporaca_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const userData = JSON.parse(savedUser);
+      // Verificar se o usuário tem permissão (apenas admin e root)
+      if (userData.role === 'admin' || userData.role === 'root') {
+        setUser(userData);
+      } else {
+        // Remover usuário sem permissão do localStorage
+        localStorage.removeItem('gruporaca_user');
+      }
     }
 
     // Animação de carregamento inicial com a logo
@@ -48,11 +59,26 @@ function App() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    // Simular delay de logout
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setUser(null);
-    localStorage.removeItem('gruporaca_user');
-    setIsLoggingOut(false);
+    
+    try {
+      // Delay para feedback visual e logout na API
+      await Promise.all([
+        fetch('/api/auth.php?action=logout', { 
+          method: 'POST',
+          credentials: 'include'
+        }).catch(() => {}), // Ignorar erros
+        new Promise(resolve => setTimeout(resolve, 600))
+      ]);
+    } catch (err) {
+      console.error('Erro ao fazer logout:', err);
+    } finally {
+      // Fade out antes de limpar
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setUser(null);
+      localStorage.removeItem('gruporaca_user');
+      setIsLoggingOut(false);
+    }
   };
 
   // Tela de carregamento inicial do site com a logo ao centro

@@ -33,6 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
         jsonError('Email ou senha incorretos', 401);
     }
     
+    // Verificar se o usuário tem permissão para acessar o sistema interno
+    // Apenas admin e root podem acessar
+    if ($user['role'] !== 'admin' && $user['role'] !== 'root') {
+        jsonError('Você não tem permissão de acesso habilitada. Apenas administradores podem acessar o sistema interno.', 403);
+    }
+    
     // Atualizar último login
     try {
         updateLastLogin($user['id']);
@@ -59,6 +65,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
         error_log("Erro no log de auditoria: " . $e->getMessage());
     }
     
+    // Registrar sessão do sistema interno
+    try {
+        require_once 'db_config.php';
+        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        
+        $conn = getDBConnection();
+        if ($conn) {
+            $stmt = $conn->prepare("
+                INSERT INTO internal_sessions 
+                (user_id, email, name, role, ip_address, user_agent, login_time)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $user['id'],
+                $user['email'],
+                $user['name'],
+                $user['role'],
+                $ipAddress,
+                $userAgent
+            ]);
+            
+            // Salvar ID da sessão interna para usar no logout
+            $_SESSION['internal_session_id'] = $conn->lastInsertId();
+        }
+    } catch (Exception $e) {
+        error_log("Erro ao registrar sessão interna: " . $e->getMessage());
+    }
+    
     // Remover senha antes de retornar
     unset($user['password']);
     
@@ -75,6 +110,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'logout
             logAudit($_SESSION['user']['id'], 'logout', null, null, []);
         } catch (Exception $e) {
             error_log("Erro no log de auditoria: " . $e->getMessage());
+        }
+        
+        // Atualizar sessão interna com logout_time e calcular duração
+        if (isset($_SESSION['internal_session_id'])) {
+            try {
+                require_once 'db_config.php';
+                $conn = getDBConnection();
+                if ($conn) {
+                    $stmt = $conn->prepare("
+                        UPDATE internal_sessions 
+                        SET logout_time = NOW(),
+                            session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([$_SESSION['internal_session_id']]);
+                }
+            } catch (Exception $e) {
+                error_log("Erro ao atualizar sessão interna: " . $e->getMessage());
+            }
         }
     }
     session_destroy();

@@ -1,5 +1,34 @@
 import { Phone, MessageCircle } from 'lucide-react';
 
+// Função para rastrear clique em assessor
+async function trackAssessorClick(
+  assessorName: string,
+  assessorCategory: 'grupo_raca' | 'campolina' | 'parceiras',
+  clickType: 'phone' | 'whatsapp' | 'email' | 'profile'
+) {
+  try {
+    const sessionId = localStorage.getItem('gruporaca_session_id') || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    if (!localStorage.getItem('gruporaca_session_id')) {
+      localStorage.setItem('gruporaca_session_id', sessionId);
+    }
+    
+    await fetch('/api/tracking.php?action=assessor_click', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        assessor_name: assessorName,
+        assessor_category: assessorCategory,
+        click_type: clickType,
+      }),
+    });
+  } catch (error) {
+    // Silenciosamente falhar - não queremos que tracking quebre o site
+    console.warn('Erro ao rastrear clique de assessor:', error);
+  }
+}
+
 // Mapeamento de nomes existentes com seus dados
 const existingAssessors: Record<string, { phone: string; whatsapp: string; email: string }> = {
   'HUGO': { phone: '(21) 98122-5464', whatsapp: '5521981225464', email: 'hugo.ferrari@gruporaca.com.br' },
@@ -221,6 +250,7 @@ export default function Assessors() {
                   <div className="space-y-3">
                     <a
                         href={`tel:${assessor.phone.replace(/\D/g, '')}`}
+                        onClick={() => trackAssessorClick(assessor.name, 'grupo_raca', 'phone')}
                       className="flex items-center gap-3 text-gray-700 hover:text-black transition-all duration-200 group/link p-2 rounded-lg hover:bg-gray-50"
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover/link:bg-black flex items-center justify-center transition-colors">
@@ -234,6 +264,7 @@ export default function Assessors() {
                           href={`https://wa.me/${assessor.whatsapp}?text=${encodeURIComponent(`Olá, ${assessor.name}! Gostaria de mais informações sobre os leilões.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => trackAssessorClick(assessor.name, 'grupo_raca', 'whatsapp')}
                           className="flex items-center gap-3 bg-black text-white px-4 py-3 rounded-xl hover:bg-gray-800 transition-all duration-300 justify-center mt-4 font-semibold group-hover:shadow-lg hover:scale-[1.02]"
                         >
                           <MessageCircle size={18} />
@@ -274,6 +305,7 @@ export default function Assessors() {
                     <div className="space-y-3">
                       <a
                         href={`tel:${assessor.phone.replace(/\D/g, '')}`}
+                        onClick={() => trackAssessorClick(assessor.name, 'campolina', 'phone')}
                       className="flex items-center gap-3 text-gray-700 hover:text-black transition-all duration-200 group/link p-2 rounded-lg hover:bg-gray-50"
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover/link:bg-black flex items-center justify-center transition-colors">
@@ -287,6 +319,7 @@ export default function Assessors() {
                       href={`https://wa.me/${assessor.whatsapp}?text=${encodeURIComponent(`Olá, ${assessor.name}! Gostaria de mais informações sobre os leilões.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackAssessorClick(assessor.name, 'campolina', 'whatsapp')}
                       className="flex items-center gap-3 bg-black text-white px-4 py-3 rounded-xl hover:bg-gray-800 transition-all duration-300 justify-center mt-4 font-semibold group-hover:shadow-lg hover:scale-[1.02]"
                     >
                       <MessageCircle size={18} />
@@ -327,6 +360,7 @@ export default function Assessors() {
                   <div className="space-y-3">
                     <a
                         href={`tel:${assessor.phone.replace(/\D/g, '')}`}
+                        onClick={() => trackAssessorClick(assessor.name, 'parceiras', 'phone')}
                       className="flex items-center gap-3 text-gray-700 hover:text-black transition-all duration-200 group/link p-2 rounded-lg hover:bg-gray-50"
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover/link:bg-black flex items-center justify-center transition-colors">
@@ -340,6 +374,7 @@ export default function Assessors() {
                       href={`https://wa.me/${assessor.whatsapp}?text=${encodeURIComponent(`Olá, ${assessor.name}! Gostaria de mais informações sobre os leilões.`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackAssessorClick(assessor.name, 'parceiras', 'whatsapp')}
                       className="flex items-center gap-3 bg-black text-white px-4 py-3 rounded-xl hover:bg-gray-800 transition-all duration-300 justify-center mt-4 font-semibold group-hover:shadow-lg hover:scale-[1.02]"
                     >
                       <MessageCircle size={18} />

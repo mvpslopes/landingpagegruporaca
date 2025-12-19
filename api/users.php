@@ -1,6 +1,8 @@
 <?php
 /**
- * Gerenciamento de Usuários (apenas ROOT)
+ * Gerenciamento de Usuários
+ * - Visualização: ADMIN e ROOT
+ * - Criação/Edição/Exclusão: Apenas ROOT
  */
 
 require_once 'config.php';
@@ -8,12 +10,12 @@ require_once 'permissions_db.php';
 
 $user = requireAuth();
 
-// Verificar se é ROOT
-if (($user['role'] ?? '') !== 'root') {
-    jsonError('Apenas ROOT pode gerenciar usuários', 403);
+// Verificar se é ADMIN ou ROOT
+if (($user['role'] ?? '') !== 'admin' && ($user['role'] ?? '') !== 'root') {
+    jsonError('Acesso negado. Apenas administradores podem acessar.', 403);
 }
 
-// GET: Listar todos os usuários
+// GET: Listar todos os usuários (ADMIN e ROOT podem visualizar)
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $users = loadUsers();
     
@@ -23,6 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     
     jsonResponse(['users' => $users]);
+}
+
+// Para operações de escrita (POST, PUT, DELETE), apenas ROOT
+if (($user['role'] ?? '') !== 'root') {
+    jsonError('Apenas ROOT pode criar, editar ou deletar usuários', 403);
 }
 
 // POST: Criar novo usuário

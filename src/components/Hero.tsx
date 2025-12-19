@@ -1,4 +1,6 @@
 import { ChevronRight } from 'lucide-react';
+import { trackClick } from '../hooks/useTracking';
+import { trackButtonClick, trackLinkClick } from '../utils/analytics';
 
 export default function Hero() {
 
@@ -82,6 +84,11 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3 md:gap-4 pt-2">
               <a
                 href="#leiloes"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  trackClick('button', 'agenda-leiloes', 'Agenda de Leilões', Math.floor(e.clientX - rect.left), Math.floor(e.clientY - rect.top));
+                  trackButtonClick('Agenda de Leilões', 'hero');
+                }}
                 className="group bg-white text-black px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-white/20 hover:shadow-xl hover:shadow-white/30 hover:scale-105 text-xs sm:text-sm md:text-base w-full sm:w-auto button-shine ripple-effect"
               >
                 Agenda de Leilões
@@ -91,6 +98,11 @@ export default function Hero() {
                 href="https://gruporaca.com/"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  trackClick('link', 'site-oficial', 'Site Oficial', Math.floor(e.clientX - rect.left), Math.floor(e.clientY - rect.top));
+                  trackLinkClick('Site Oficial', 'https://gruporaca.com/', 'hero');
+                }}
                 className="group bg-transparent border-2 border-white/30 text-white px-4 sm:px-5 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-white/10 hover:border-white/50 transition-all duration-300 backdrop-blur-sm hover:scale-105 text-xs sm:text-sm md:text-base text-center w-full sm:w-auto button-shine ripple-effect glass-effect"
               >
                 Site Oficial
