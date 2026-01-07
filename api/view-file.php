@@ -4,10 +4,13 @@
  * Serve como proxy para exibir imagens e arquivos do Google Drive
  */
 
-// Limpar qualquer output anterior
-if (ob_get_level()) {
-    ob_clean();
+// Limpar qualquer output anterior completamente
+while (ob_get_level()) {
+    ob_end_clean();
 }
+
+// Iniciar novo buffer de output
+ob_start();
 
 require_once 'config.php';
 require_once 'permissions_db.php';
@@ -119,7 +122,7 @@ try {
                 curl_close($ch);
                 
                 if ($httpCode === 200 && $content !== false && !$error && strlen($content) > 0) {
-                    // Limpar qualquer output anterior
+                    // Limpar qualquer output anterior completamente
                     while (ob_get_level()) {
                         ob_end_clean();
                     }
@@ -132,8 +135,9 @@ try {
                     header('Access-Control-Allow-Credentials: true');
                     header('X-Content-Type-Options: nosniff');
                     
-                    // Enviar conteúdo
+                    // Enviar conteúdo diretamente
                     echo $content;
+                    flush();
                     exit;
                 } else {
                     error_log("Erro ao baixar imagem via API v3: HTTP {$httpCode}, Erro: {$error}");
@@ -153,7 +157,7 @@ try {
                         curl_close($ch);
                         
                         if ($httpCode === 200 && $content !== false && !$error && strlen($content) > 0) {
-                            // Limpar qualquer output anterior
+                            // Limpar qualquer output anterior completamente
                             while (ob_get_level()) {
                                 ob_end_clean();
                             }
@@ -165,6 +169,7 @@ try {
                             header('Access-Control-Allow-Credentials: true');
                             header('X-Content-Type-Options: nosniff');
                             echo $content;
+                            flush();
                             exit;
                         } else {
                             error_log("Erro ao baixar imagem via downloadLink: HTTP {$httpCode}, Erro: {$error}");
@@ -194,24 +199,55 @@ try {
             }
         } catch (Exception $e) {
             error_log('Erro ao baixar imagem: ' . $e->getMessage());
+            // Limpar output buffer antes de enviar erro
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             http_response_code(500);
-            die('Erro ao carregar imagem: ' . $e->getMessage());
+            header('Content-Type: application/json');
+            echo json_encode([
+                'error' => true,
+                'message' => 'Erro ao carregar imagem: ' . $e->getMessage()
+            ]);
+            exit;
         }
     } else {
         // Para outros arquivos, redirecionar para viewLink
         $viewLink = $fileInfo['viewLink'] ?? $fileInfo['downloadLink'] ?? null;
         if ($viewLink) {
+            // Limpar output buffer antes de redirecionar
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             header('Location: ' . $viewLink);
             exit;
         } else {
+            // Limpar output buffer antes de enviar erro
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
             http_response_code(404);
-            die('Arquivo não encontrado');
+            header('Content-Type: application/json');
+            echo json_encode([
+                'error' => true,
+                'message' => 'Arquivo não encontrado'
+            ]);
+            exit;
         }
     }
 } catch (Exception $e) {
     error_log('Erro ao visualizar arquivo: ' . $e->getMessage());
+    // Limpar output buffer antes de enviar erro
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
     http_response_code(500);
-    die('Erro ao carregar arquivo: ' . $e->getMessage());
+    header('Content-Type: application/json');
+    echo json_encode([
+        'error' => true,
+        'message' => 'Erro ao carregar arquivo: ' . $e->getMessage()
+    ]);
+    exit;
 }
 ?>
 

@@ -888,12 +888,6 @@ export default function DatabasePage() {
             {/* Seletor de Pastas para ROOT/ADMIN */}
             {(() => {
               const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin';
-              console.log('Renderizando seletor de pastas:', {
-                userRole: user?.role,
-                isRootOrAdmin,
-                foldersCount: folders.length,
-                folders: folders
-              });
               
               if (!isRootOrAdmin) {
                 return null;
@@ -1538,33 +1532,43 @@ export default function DatabasePage() {
                           url: (e.target as HTMLImageElement).src
                         });
                         const target = e.target as HTMLImageElement;
-                        setPreviewImageLoading(false);
-                        setPreviewImageError(true);
                         
-                        // Tentar verificar se o problema é de autenticação
+                        // Tentar verificar se o problema é de autenticação ou formato
                         try {
-                          const response = await fetch(`/api/view-file.php?id=${previewFile.id}`, {
+                          const response = await fetch(`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`, {
                             credentials: 'include'
                           });
                           const contentType = response.headers.get('content-type');
-                          console.log('Resposta do servidor:', {
-                            status: response.status,
-                            contentType: contentType,
-                            ok: response.ok
-                          });
+                          
                           if (!response.ok) {
-                            const errorData = await response.json().catch(() => null);
-                            console.error('Erro do servidor:', response.status, errorData);
+                            // Se não for OK, tentar ler como JSON para ver o erro
+                            const errorText = await response.text();
+                            let errorData = null;
+                            try {
+                              errorData = JSON.parse(errorText);
+                            } catch {
+                              // Não é JSON, usar o texto direto
+                            }
+                            console.error('Erro do servidor:', response.status, errorData || errorText);
+                            setPreviewImageLoading(false);
+                            setPreviewImageError(true);
                           } else if (contentType && contentType.startsWith('image/')) {
-                            // Se a resposta é uma imagem, tentar usar blob URL
+                            // Se a resposta é uma imagem, usar blob URL
                             const blob = await response.blob();
                             const blobUrl = window.URL.createObjectURL(blob);
                             target.src = blobUrl;
                             setPreviewImageError(false);
                             setPreviewImageLoading(false);
+                          } else {
+                            // Content-Type não é imagem
+                            console.error('Resposta não é uma imagem:', contentType);
+                            setPreviewImageLoading(false);
+                            setPreviewImageError(true);
                           }
                         } catch (fetchError) {
                           console.error('Erro ao verificar URL:', fetchError);
+                          setPreviewImageLoading(false);
+                          setPreviewImageError(true);
                         }
                       }}
                       onLoad={() => {
