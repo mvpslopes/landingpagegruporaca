@@ -46,13 +46,11 @@ export default function Login({ onClose, onSuccess }: LoginProps) {
         return;
       }
 
-      // Verificar se o usuário tem permissão para acessar o sistema interno
-      // Apenas admin e root podem acessar
-      if (response.user.role !== 'admin' && response.user.role !== 'root') {
-        setError('Você não tem permissão de acesso habilitada. Apenas administradores podem acessar o sistema interno.');
-        setLoading(false);
-        return;
-      }
+      // Permitir acesso a todos os usuários ativos
+      // O sistema de permissões vai controlar o que cada role pode fazer
+      // ROOT: acesso total
+      // ADMIN: acesso ao sistema interno (sem gerenciar usuários)
+      // USER: acesso limitado à própria pasta (conforme permissões no banco)
 
       // Salvar usuário no localStorage
       localStorage.setItem('gruporaca_user', JSON.stringify(response.user));

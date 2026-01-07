@@ -7,7 +7,14 @@ export default function Hero() {
   return (
     <section className="relative min-h-[85vh] sm:min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-black via-gray-900 to-black text-white bg-gradient-animated">
       {/* Background com overlay mais sutil para destacar a imagem */}
-      <div className="absolute inset-0 bg-cover bg-center brightness-110 saturate-110" style={{ backgroundImage: "url('/Fundo Cavalo preto.jpg')", transform: 'scaleX(-1)' }}></div>
+      <div 
+        className="absolute inset-0 bg-center brightness-110 saturate-110 bg-no-repeat hero-background-image"
+        style={{ 
+          backgroundImage: "url('/Fundo Cavalo preto.jpg')", 
+          transform: 'scaleX(-1)',
+          backgroundSize: 'cover'
+        }}
+      ></div>
       <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/30 to-black/50"></div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent_60%)]"></div>
       

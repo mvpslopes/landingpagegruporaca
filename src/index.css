@@ -677,3 +677,46 @@
   animation: logo-shine 3s ease-in-out infinite;
 }
 
+/* Otimização de renderização de imagem para mobile */
+.hero-background-image {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Melhor renderização no mobile - evita serrilhamento */
+@media (max-width: 640px) {
+  .hero-background-image {
+    background-size: cover !important;
+    background-position: center center !important;
+    /* Renderização suave para fotos (não pixel art) */
+    image-rendering: auto;
+    -webkit-image-rendering: auto;
+    /* Força renderização suave com aceleração de hardware */
+    -webkit-transform: translate3d(0, 0, 0) scaleX(-1);
+    transform: translate3d(0, 0, 0) scaleX(-1);
+    /* Melhora qualidade de renderização */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    /* Suavização de fontes (pode ajudar na renderização geral) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Para telas de alta densidade (Retina) - renderização automática */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .hero-background-image {
+    image-rendering: auto;
+    /* Força renderização de alta qualidade */
+    -webkit-transform: translate3d(0, 0, 0) scaleX(-1);
+    transform: translate3d(0, 0, 0) scaleX(-1);
+  }
+}
+

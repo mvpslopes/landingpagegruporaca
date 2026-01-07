@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   LogOut, Users, 
   LayoutDashboard, Settings, BarChart3,
@@ -7,6 +7,7 @@ import {
 import * as api from '../lib/api';
 import Analytics from './Analytics';
 import InternalUsersStats from './InternalUsersStats';
+import { useInactivity } from '../hooks/useInactivity';
 
 interface DashboardProps {
   user: any;
@@ -20,6 +21,70 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
+  const [sessionTimeout, setSessionTimeout] = useState(5 * 60 * 1000); // 5 minutos padrão
+  const authCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Verificar autenticação periodicamente e limpar sessões expiradas
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await api.checkAuth();
+        if (response.error || !response.authenticated) {
+          // Sessão expirada, fazer logout
+          handleInactive();
+        } else if (response.timeout) {
+          // Atualizar timeout se retornado pelo servidor
+          setSessionTimeout(response.timeout * 1000);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+      }
+    };
+
+    // Limpar sessões expiradas ao carregar o Dashboard (apenas uma vez)
+    const cleanupOnLoad = async () => {
+      try {
+        await api.cleanupExpiredSessions();
+      } catch (error) {
+        console.error('Erro ao limpar sessões expiradas:', error);
+      }
+    };
+
+    // Limpar sessões antigas imediatamente ao carregar
+    cleanupOnLoad();
+
+    // Verificar a cada 30 segundos
+    authCheckIntervalRef.current = setInterval(checkAuth, 30000);
+
+    // Verificar imediatamente
+    checkAuth();
+
+    return () => {
+      if (authCheckIntervalRef.current) {
+        clearInterval(authCheckIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Handler para quando usuário fica inativo
+  const handleInactive = async () => {
+    try {
+      // Tentar fazer logout no servidor (vai atualizar o banco)
+      await api.logout();
+    } catch (error) {
+      console.error('Erro ao fazer logout automático:', error);
+    } finally {
+      // Sempre fazer logout no frontend
+      onLogout();
+    }
+  };
+
+  // Hook de inatividade - detecta quando usuário não interage
+  useInactivity({
+    timeout: sessionTimeout,
+    onInactive: handleInactive,
+    enabled: true
+  });
 
   useEffect(() => {
     if (activeTab === 'users' && (user.role === 'admin' || user.role === 'root')) {

@@ -29,6 +29,9 @@ interface FileItem {
   uploaded_by: string;
   folder: string;
   tags?: string[];
+  mimeType?: string;
+  downloadLink?: string;
+  viewLink?: string;
 }
 
 interface ApiResponse<T> {
@@ -80,7 +83,7 @@ export async function logout(): Promise<ApiResponse<null>> {
   }
 }
 
-export async function checkAuth(): Promise<ApiResponse<User>> {
+export async function checkAuth(): Promise<ApiResponse<User & { last_activity?: number; timeout?: number }>> {
   try {
     const response = await fetch(`${API_BASE_URL}/auth.php?action=check`, {
       credentials: 'include',
@@ -95,6 +98,25 @@ export async function checkAuth(): Promise<ApiResponse<User>> {
     return data;
   } catch (error: any) {
     return { error: error.message || 'Erro ao verificar autenticação' };
+  }
+}
+
+export async function cleanupExpiredSessions(): Promise<ApiResponse<{ cleaned: number }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth.php?action=cleanup_expired`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao limpar sessões expiradas');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao limpar sessões expiradas' };
   }
 }
 

@@ -11,17 +11,20 @@ if (!file_exists($autoloadPath)) {
     throw new Exception('Autoloader do Composer não encontrado em: ' . $autoloadPath . '. Faça upload da pasta vendor/ completa.');
 }
 
+// Suprimir erros do Composer relacionados a aliases.php (arquivo opcional)
+$oldErrorReporting = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 require_once $autoloadPath;
+error_reporting($oldErrorReporting);
 
-// Carregar aliases para compatibilidade (Google_Client, Google_Service_Drive, etc.)
+// Carregar aliases para compatibilidade (Google_Client, Google_Service_Drive, etc.) - OPCIONAL
 $aliasesPath = __DIR__ . '/src/aliases.php';
 if (file_exists($aliasesPath)) {
-    require_once $aliasesPath;
+    @require_once $aliasesPath;
 } else {
     // Se não encontrar em src/, tentar em vendor/google/apiclient/src/
     $aliasesPathAlt = __DIR__ . '/vendor/google/apiclient/src/aliases.php';
     if (file_exists($aliasesPathAlt)) {
-        require_once $aliasesPathAlt;
+        @require_once $aliasesPathAlt;
     }
 }
 
@@ -47,22 +50,46 @@ class DriveService {
         $this->config = require $configPath;
         $this->rootFolderId = $this->config['root_folder_id'];
         
-        // Inicializar cliente Google
-        $this->client = new Google_Client();
+        // Inicializar cliente Google (tentar com alias primeiro, depois namespace)
+        if (class_exists('Google_Client')) {
+            $this->client = new Google_Client();
+        } elseif (class_exists('Google\Client')) {
+            $this->client = new \Google\Client();
+        } else {
+            throw new Exception('Classe Google_Client não encontrada. Verifique se a biblioteca Google API foi carregada corretamente.');
+        }
         $this->client->setScopes($this->config['scopes']);
         $this->client->setAccessType('offline');
         
         // Se tiver token OAuth, usar OAuth (prioridade)
         if ($oauthToken) {
             $this->useOAuth = true;
+            
+            // Configurar credenciais OAuth se disponíveis (necessário para refresh token)
+            if (isset($this->config['oauth_client_id']) && isset($this->config['oauth_client_secret'])) {
+                $this->client->setClientId($this->config['oauth_client_id']);
+                $this->client->setClientSecret($this->config['oauth_client_secret']);
+            }
+            
             $this->client->setAccessToken($oauthToken);
             
             // Se token expirou, tentar renovar
             if ($this->client->isAccessTokenExpired()) {
-                if (isset($oauthToken['refresh_token'])) {
-                    $this->client->refreshToken($oauthToken['refresh_token']);
+                if (isset($oauthToken['refresh_token']) && !empty($oauthToken['refresh_token'])) {
+                    try {
+                        $newToken = $this->client->refreshToken($oauthToken['refresh_token']);
+                        // Atualizar token no arquivo persistente
+                        if (file_exists(__DIR__ . '/oauth_token_storage.php')) {
+                            require_once __DIR__ . '/oauth_token_storage.php';
+                            $updatedToken = array_merge($oauthToken, $newToken);
+                            OAuthTokenStorage::saveToken($updatedToken);
+                        }
+                    } catch (Exception $e) {
+                        error_log('Erro ao renovar token OAuth: ' . $e->getMessage());
+                        throw new Exception('Token OAuth expirado e não foi possível renovar. Reautorize o acesso em /api/oauth-drive.php');
+                    }
                 } else {
-                    throw new Exception('Token OAuth expirado e sem refresh token. Reautorize o acesso.');
+                    throw new Exception('Token OAuth expirado e sem refresh token. Reautorize o acesso em /api/oauth-drive.php');
                 }
             }
         } else {
@@ -75,8 +102,14 @@ class DriveService {
             }
         }
         
-        // Criar serviço do Drive
-        $this->service = new Google_Service_Drive($this->client);
+        // Criar serviço do Drive (tentar com alias primeiro, depois namespace)
+        if (class_exists('Google_Service_Drive')) {
+            $this->service = new Google_Service_Drive($this->client);
+        } elseif (class_exists('Google\Service\Drive')) {
+            $this->service = new \Google\Service\Drive($this->client);
+        } else {
+            throw new Exception('Classe Google_Service_Drive não encontrada.');
+        }
     }
     
     /**
@@ -140,11 +173,22 @@ class DriveService {
         $parentId = $parentId ?? $this->rootFolderId;
         
         try {
-            $fileMetadata = new Google_Service_Drive_DriveFile([
-                'name' => $name,
-                'mimeType' => 'application/vnd.google-apps.folder',
-                'parents' => [$parentId]
-            ]);
+            // Criar metadata do arquivo (tentar com alias primeiro, depois namespace)
+            if (class_exists('Google_Service_Drive_DriveFile')) {
+                $fileMetadata = new Google_Service_Drive_DriveFile([
+                    'name' => $name,
+                    'mimeType' => 'application/vnd.google-apps.folder',
+                    'parents' => [$parentId]
+                ]);
+            } elseif (class_exists('Google\Service\Drive\DriveFile')) {
+                $fileMetadata = new \Google\Service\Drive\DriveFile([
+                    'name' => $name,
+                    'mimeType' => 'application/vnd.google-apps.folder',
+                    'parents' => [$parentId]
+                ]);
+            } else {
+                throw new Exception('Classe Google_Service_Drive_DriveFile não encontrada.');
+            }
             
             $folder = $this->service->files->create($fileMetadata, [
                 'fields' => 'id, name',
@@ -169,8 +213,17 @@ class DriveService {
             if ($folderPath === '*') {
                 $folderId = $this->rootFolderId;
             } else {
-                // Obter ID da pasta pelo caminho
-                $folderId = $this->ensureFolder($folderPath);
+                // Se o caminho não contém '/', buscar pasta diretamente na raiz (não criar)
+                if (strpos($folderPath, '/') === false) {
+                    $folderId = $this->getFolderIdByName($folderPath, $this->rootFolderId);
+                    // Se não encontrar, listar da raiz (não criar pasta automaticamente)
+                    if (!$folderId) {
+                        $folderId = $this->rootFolderId;
+                    }
+                } else {
+                    // Se contém '/', usar ensureFolder para criar estrutura se necessário
+                    $folderId = $this->ensureFolder($folderPath);
+                }
             }
             
             $query = "'" . addslashes($folderId) . "' in parents and trashed = false";
@@ -181,7 +234,7 @@ class DriveService {
             
             $results = $this->service->files->listFiles([
                 'q' => $query,
-                'fields' => 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink)',
+                'fields' => 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink)',
                 'orderBy' => 'modifiedTime desc',
                 'supportsAllDrives' => true,
                 'includeItemsFromAllDrives' => true
@@ -190,16 +243,34 @@ class DriveService {
             $files = [];
             foreach ($results->getFiles() as $file) {
                 $isFolder = $file->getMimeType() === 'application/vnd.google-apps.folder';
+                $fileId = $file->getId();
+                $mimeType = $file->getMimeType();
+                
+                // Gerar URL de thumbnail para imagens
+                $thumbnailUrl = null;
+                $isImage = strpos($mimeType, 'image/') === 0;
+                if ($isImage && !$isFolder) {
+                    // Tentar usar thumbnailLink primeiro (se disponível)
+                    $thumbnailLink = method_exists($file, 'getThumbnailLink') ? $file->getThumbnailLink() : null;
+                    if ($thumbnailLink) {
+                        $thumbnailUrl = $thumbnailLink;
+                    } else {
+                        // Se não tiver thumbnailLink, usar nosso proxy
+                        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+                        $thumbnailUrl = $baseUrl . "/api/view-file.php?id={$fileId}";
+                    }
+                }
                 
                 $files[] = [
-                    'id' => $file->getId(),
+                    'id' => $fileId,
                     'name' => $file->getName(),
                     'type' => $isFolder ? 'folder' : 'file',
-                    'mimeType' => $file->getMimeType(),
+                    'mimeType' => $mimeType,
                     'size' => $isFolder ? null : (int)$file->getSize(),
                     'modifiedTime' => $file->getModifiedTime(),
                     'viewLink' => $file->getWebViewLink(),
                     'downloadLink' => $file->getWebContentLink(),
+                    'url' => $thumbnailUrl ?: $file->getWebViewLink(), // URL para thumbnail ou viewLink
                     'folder' => $folderPath
                 ];
             }
@@ -233,7 +304,20 @@ class DriveService {
             if ($folderPath === '*') {
                 $folderId = $this->rootFolderId;
             } else {
-                $folderId = $this->ensureFolder($folderPath);
+                // Se o caminho não contém '/', é uma pasta única - buscar diretamente na raiz
+                if (strpos($folderPath, '/') === false) {
+                    // Tentar buscar a pasta diretamente na raiz (GRUPO_RACA)
+                    $folderId = $this->getFolderIdByName($folderPath, $this->rootFolderId);
+                    // Se não encontrar, NÃO criar automaticamente - isso evita criar pastas duplicadas
+                    // A pasta deve ser criada manualmente ou já existir
+                    if (!$folderId) {
+                        error_log("Aviso: Pasta '{$folderPath}' não encontrada na raiz. Upload será feito na raiz.");
+                        $folderId = $this->rootFolderId; // Fazer upload na raiz se pasta não existir
+                    }
+                } else {
+                    // Se contém '/', usar ensureFolder para criar estrutura completa
+                    $folderId = $this->ensureFolder($folderPath);
+                }
             }
             
             // Verificar se a pasta está em Shared Drive ou é compartilhada
@@ -249,11 +333,20 @@ class DriveService {
                 error_log('Aviso: Não foi possível verificar informações da pasta pai: ' . $e->getMessage());
             }
             
-            // Criar metadata do arquivo
-            $fileMetadata = new Google_Service_Drive_DriveFile([
-                'name' => $fileName,
-                'parents' => [$folderId]
-            ]);
+            // Criar metadata do arquivo (tentar com alias primeiro, depois namespace)
+            if (class_exists('Google_Service_Drive_DriveFile')) {
+                $fileMetadata = new Google_Service_Drive_DriveFile([
+                    'name' => $fileName,
+                    'parents' => [$folderId]
+                ]);
+            } elseif (class_exists('Google\Service\Drive\DriveFile')) {
+                $fileMetadata = new \Google\Service\Drive\DriveFile([
+                    'name' => $fileName,
+                    'parents' => [$folderId]
+                ]);
+            } else {
+                throw new Exception('Classe Google_Service_Drive_DriveFile não encontrada.');
+            }
             
             // Upload do arquivo
             $content = file_get_contents($filePath);
@@ -296,7 +389,13 @@ class DriveService {
                 if ($needsTransfer) {
                     try {
                         // Criar permissão de proprietário para o dono da pasta
-                        $newPermission = new Google_Service_Drive_Permission();
+                        if (class_exists('Google_Service_Drive_Permission')) {
+                            $newPermission = new Google_Service_Drive_Permission();
+                        } elseif (class_exists('Google\Service\Drive\Permission')) {
+                            $newPermission = new \Google\Service\Drive\Permission();
+                        } else {
+                            throw new Exception('Classe Google_Service_Drive_Permission não encontrada.');
+                        }
                         $newPermission->setType('user');
                         $newPermission->setRole('owner');
                         $newPermission->setEmailAddress($parentOwnerEmail);
@@ -320,15 +419,28 @@ class DriveService {
                 }
             }
             
+            $fileId = $file->getId();
+            $mimeType = $file->getMimeType();
+            
+            // Gerar URL de thumbnail para imagens
+            $thumbnailUrl = null;
+            $isImage = strpos($mimeType, 'image/') === 0;
+            if ($isImage) {
+                // Usar nosso proxy para garantir que funcione com autenticação
+                $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+                $thumbnailUrl = $baseUrl . "/api/view-file.php?id={$fileId}";
+            }
+            
             return [
-                'id' => $file->getId(),
+                'id' => $fileId,
                 'name' => $file->getName(),
                 'type' => 'file',
-                'mimeType' => $file->getMimeType(),
+                'mimeType' => $mimeType,
                 'size' => (int)$file->getSize(),
                 'modifiedTime' => $file->getModifiedTime(),
                 'viewLink' => $file->getWebViewLink(),
                 'downloadLink' => $file->getWebContentLink(),
+                'url' => $thumbnailUrl ?: $file->getWebViewLink(), // URL para thumbnail ou viewLink
                 'folder' => $folderPath
             ];
         } catch (Exception $e) {

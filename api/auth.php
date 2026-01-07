@@ -33,11 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
         jsonError('Email ou senha incorretos', 401);
     }
     
-    // Verificar se o usuário tem permissão para acessar o sistema interno
-    // Apenas admin e root podem acessar
-    if ($user['role'] !== 'admin' && $user['role'] !== 'root') {
-        jsonError('Você não tem permissão de acesso habilitada. Apenas administradores podem acessar o sistema interno.', 403);
-    }
+    // Permitir acesso a todos os usuários ativos
+    // O sistema de permissões (hasPermission) vai controlar o que cada role pode fazer
+    // ROOT: acesso total
+    // ADMIN: acesso ao sistema interno (sem gerenciar usuários)
+    // USER: acesso limitado à própria pasta (conforme permissões no banco)
     
     // Atualizar último login
     try {
@@ -137,22 +137,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'logout
 
 // Rota: GET /api/auth.php?action=check
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'check') {
+    // Limpar sessões expiradas no banco automaticamente (executa a cada verificação)
+    try {
+        require_once 'db_config.php';
+        $conn = getDBConnection();
+        if ($conn) {
+            // Encerrar sessões que estão abertas há mais de SESSION_TIMEOUT segundos
+            $stmt = $conn->prepare("
+                UPDATE internal_sessions 
+                SET logout_time = NOW(),
+                    session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                WHERE logout_time IS NULL 
+                AND TIMESTAMPDIFF(SECOND, login_time, NOW()) > ?
+            ");
+            $stmt->execute([SESSION_TIMEOUT]);
+        }
+    } catch (Exception $e) {
+        error_log("Erro ao limpar sessões expiradas automaticamente: " . $e->getMessage());
+    }
+    
     // Verificar timeout de sessão
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > SESSION_TIMEOUT) {
+        // Encerrar sessão no banco de dados antes de destruir a sessão PHP
+        if (isset($_SESSION['internal_session_id'])) {
+            try {
+                require_once 'db_config.php';
+                $conn = getDBConnection();
+                if ($conn) {
+                    $stmt = $conn->prepare("
+                        UPDATE internal_sessions 
+                        SET logout_time = NOW(),
+                            session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                        WHERE id = ? AND logout_time IS NULL
+                    ");
+                    $stmt->execute([$_SESSION['internal_session_id']]);
+                }
+            } catch (Exception $e) {
+                error_log("Erro ao encerrar sessão expirada no banco: " . $e->getMessage());
+            }
+        }
         session_destroy();
-        jsonError('Sessão expirada', 401);
+        jsonError('Sessão expirada por inatividade', 401);
     }
     
     if (isset($_SESSION['user'])) {
         $_SESSION['last_activity'] = time();
         jsonResponse([
             'authenticated' => true,
-            'user' => $_SESSION['user']
+            'user' => $_SESSION['user'],
+            'last_activity' => $_SESSION['last_activity'],
+            'timeout' => SESSION_TIMEOUT
         ]);
     } else {
         jsonResponse([
             'authenticated' => false
         ]);
+    }
+}
+
+// Rota: POST /api/auth.php?action=cleanup_expired
+// Limpa sessões expiradas no banco de dados (pode ser chamado periodicamente)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'cleanup_expired') {
+    requireAuth(); // Apenas usuários autenticados podem executar
+    
+    try {
+        require_once 'db_config.php';
+        $conn = getDBConnection();
+        if ($conn) {
+            // Encerrar sessões que estão abertas há mais de SESSION_TIMEOUT segundos
+            $stmt = $conn->prepare("
+                UPDATE internal_sessions 
+                SET logout_time = NOW(),
+                    session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                WHERE logout_time IS NULL 
+                AND TIMESTAMPDIFF(SECOND, login_time, NOW()) > ?
+            ");
+            $stmt->execute([SESSION_TIMEOUT]);
+            $affected = $stmt->rowCount();
+            
+            jsonResponse([
+                'success' => true,
+                'message' => "Sessões expiradas encerradas: {$affected}",
+                'cleaned' => $affected
+            ]);
+        } else {
+            jsonError('Erro ao conectar ao banco de dados', 500);
+        }
+    } catch (Exception $e) {
+        error_log("Erro ao limpar sessões expiradas: " . $e->getMessage());
+        jsonError('Erro ao limpar sessões expiradas: ' . $e->getMessage(), 500);
     }
 }
 

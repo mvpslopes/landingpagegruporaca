@@ -1,23 +1,41 @@
 <?php
 /**
  * Listar Pastas Disponíveis
- * Para ROOT/ADMIN: lista todas as pastas do Backblaze B2
+ * Para ROOT/ADMIN: lista todas as pastas do Google Drive
  * Para USER: lista apenas sua pasta
  */
+
+// Limpar qualquer output anterior
+if (ob_get_level() > 0) {
+    ob_clean();
+}
 
 require_once 'config.php';
 require_once 'permissions_db.php';
 
 $user = requireAuth();
 
-// Tentar carregar B2Service
-$b2Service = null;
+// Carregar DriveService
+$driveService = null;
 try {
-    require_once __DIR__ . '/b2_service.php';
-    $b2Service = new B2Service();
+    require_once __DIR__ . '/drive_service.php';
+    
+    // Tentar obter token OAuth (arquivo persistente ou sessão)
+    $oauthToken = null;
+    require_once __DIR__ . '/oauth_token_storage.php';
+    $oauthToken = OAuthTokenStorage::loadToken();
+    
+    $driveService = new DriveService($oauthToken);
 } catch (Exception $e) {
-    error_log('Erro ao carregar B2Service: ' . $e->getMessage());
-    jsonError('Backblaze B2 não configurado', 503);
+    error_log('Erro ao carregar DriveService: ' . $e->getMessage());
+    
+    // Se erro for sobre falta de autenticação, sugerir autorização OAuth
+    if (strpos($e->getMessage(), 'Nenhuma autenticação configurada') !== false || 
+        strpos($e->getMessage(), 'Service Account') !== false) {
+        jsonError('Google Drive não autorizado. Um administrador precisa autorizar o acesso OAuth primeiro. Acesse: /api/oauth-drive.php', 503);
+    } else {
+        jsonError('Erro ao conectar com Google Drive: ' . $e->getMessage(), 503);
+    }
 }
 
 // GET: Listar pastas disponíveis
@@ -25,30 +43,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $folders = [];
         
-        // Se for ROOT ou ADMIN, listar todas as pastas da raiz do B2
+        // Se for ROOT ou ADMIN, listar todas as pastas da raiz do Google Drive
         if ($user['role'] === 'root' || $user['role'] === 'admin') {
-            // Listar todos os arquivos para extrair nomes de pastas
+            // Adicionar opção "Todas" primeiro
+            $folders[] = [
+                'id' => '*',
+                'name' => 'Todas',
+                'path' => '*'
+            ];
+            
+            // Tentar listar pastas do Google Drive (opcional - se falhar, retorna apenas "Todas")
             try {
-                $allFiles = $b2Service->listFiles('*', true);
+                // Listar arquivos da raiz do Google Drive
+                $allFiles = $driveService->listFiles('', true);
                 
                 // Extrair nomes únicos de pastas (primeiro nível)
                 $folderNames = [];
-                foreach ($allFiles as $item) {
-                    if ($item['type'] === 'folder') {
-                        $folderName = $item['name'];
-                        // Se a pasta está na raiz (não tem / no nome), adicionar
-                        if (strpos($folderName, '/') === false && !in_array($folderName, $folderNames)) {
-                            $folderNames[] = $folderName;
-                        }
-                    } else {
-                        // Para arquivos, extrair a primeira parte do caminho do fileName
-                        // No B2, o caminho está no fileName, não no folder
-                        $fileName = $item['name'] ?? '';
-                        if (strpos($fileName, '/') !== false) {
-                            $pathParts = explode('/', $fileName);
-                            $firstPart = $pathParts[0];
-                            if (!empty($firstPart) && !in_array($firstPart, $folderNames)) {
-                                $folderNames[] = $firstPart;
+                if (is_array($allFiles)) {
+                    foreach ($allFiles as $item) {
+                        if (isset($item['type']) && $item['type'] === 'folder') {
+                            $folderName = $item['name'] ?? '';
+                            if (!empty($folderName) && !in_array($folderName, $folderNames)) {
+                                $folderNames[] = $folderName;
                             }
                         }
                     }
@@ -63,21 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     ];
                 }
                 
-                // Ordenar por nome
-                usort($folders, function($a, $b) {
-                    return strcmp($a['name'], $b['name']);
-                });
+                // Ordenar por nome (mantendo "Todas" no início)
+                if (count($folders) > 1) {
+                    $todas = array_shift($folders);
+                    usort($folders, function($a, $b) {
+                        return strcmp($a['name'], $b['name']);
+                    });
+                    array_unshift($folders, $todas);
+                }
             } catch (Exception $e) {
-                // Se houver erro ao listar do B2, continuar com lista vazia
-                error_log('Erro ao listar pastas do B2: ' . $e->getMessage());
+                // Se houver erro ao listar do Google Drive, continuar com apenas "Todas"
+                error_log('Erro ao listar pastas do Google Drive: ' . $e->getMessage());
+                error_log('Stack trace: ' . $e->getTraceAsString());
+                // Já temos "Todas" na lista, então apenas continuar
             }
-            
-            // Adicionar opção "Todas" no início
-            array_unshift($folders, [
-                'id' => '*',
-                'name' => 'Todas',
-                'path' => '*'
-            ]);
         } else {
             // Se for USER, retornar apenas sua pasta (definida no banco de dados)
             $userFolder = $user['folder'] ?? '';
@@ -99,13 +114,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
         }
         
+        // Garantir que sempre retornamos pelo menos "Todas"
+        if (empty($folders)) {
+            $folders = [[
+                'id' => '*',
+                'name' => 'Todas',
+                'path' => '*'
+            ]];
+        }
+        
         jsonResponse([
             'folders' => $folders,
             'userRole' => $user['role']
         ]);
     } catch (Exception $e) {
         error_log('Erro ao listar pastas: ' . $e->getMessage());
-        jsonError('Erro ao listar pastas: ' . $e->getMessage(), 500);
+        error_log('Stack trace: ' . $e->getTraceAsString());
+        
+        // Em caso de erro, retornar pelo menos "Todas"
+        jsonResponse([
+            'folders' => [[
+                'id' => '*',
+                'name' => 'Todas',
+                'path' => '*'
+            ]],
+            'userRole' => $user['role'] ?? 'user',
+            'error' => 'Erro ao carregar pastas: ' . $e->getMessage()
+        ]);
     }
 }
 

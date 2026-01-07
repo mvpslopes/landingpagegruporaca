@@ -10,13 +10,13 @@ return [
     // Caminho para o arquivo de credenciais JSON (Service Account - opcional)
     'credentials_path' => __DIR__ . '/grupo-raca-drive-credentials.json',
     
-    // ID da pasta raiz no Google Drive
-    'root_folder_id' => '1v8BQP6rK7659-bbhlvkT10RQcZDOEMXY',
+    // ID da pasta raiz no Google Drive (Shared Drive)
+    'root_folder_id' => '1bXf338lIktS_6ss1-WoKuMfI-gpWryjn',
     
     // OAuth Credentials (para upload centralizado - REQUERIDO)
     // Obtenha em: https://console.cloud.google.com/apis/credentials
-    'oauth_client_id' => '', // Preencher com Client ID do OAuth
-    'oauth_client_secret' => '', // Preencher com Client Secret do OAuth
+    'oauth_client_id' => 'REDACTED-CLIENT-ID.apps.googleusercontent.com',
+    'oauth_client_secret' => 'REDACTED-OAUTH-CLIENT-SECRET',
     'oauth_redirect_uri' => 'https://gruporaca.app.br/api/oauth-drive.php',
     
     // Escopos necessários para acessar o Google Drive

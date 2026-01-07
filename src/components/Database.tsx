@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   LogIn, X, Search, Upload, Eye, Download, Trash2, 
-  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, AlertCircle, CheckCircle2, CheckCircle
+  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, CheckCircle
 } from 'lucide-react';
 import Loading from './Loading';
 import Modal from './Modal';
@@ -31,6 +31,89 @@ export default function DatabasePage() {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [loginVisible, setLoginVisible] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [previewImageError, setPreviewImageError] = useState(false);
+  const [previewImageLoading, setPreviewImageLoading] = useState(true);
+  
+  // Função para obter lista de imagens filtradas
+  const getImageFiles = useCallback(() => {
+    return files.filter(file => 
+      (file as any).mimeType?.startsWith('image/') &&
+      (file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (file.tags && file.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))))
+    );
+  }, [files, searchTerm]);
+  
+  // Função para navegar entre imagens
+  const navigateImage = useCallback((direction: 'prev' | 'next') => {
+    const imageFiles = getImageFiles();
+    if (imageFiles.length === 0 || !previewFile) return;
+    
+    const currentIndex = imageFiles.findIndex(f => f.id === previewFile.id);
+    if (currentIndex === -1) return;
+    
+    let newIndex: number;
+    if (direction === 'next') {
+      newIndex = (currentIndex + 1) % imageFiles.length;
+    } else {
+      newIndex = currentIndex === 0 ? imageFiles.length - 1 : currentIndex - 1;
+    }
+    
+    const newFile = imageFiles[newIndex];
+    if (newFile) {
+      setPreviewImageError(false);
+      setPreviewImageLoading(true);
+      setPreviewFile(newFile);
+    }
+  }, [previewFile, getImageFiles]);
+  
+  // Adicionar listeners de teclado para navegação
+  useEffect(() => {
+    if (!previewFile) return;
+    
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateImage('next');
+      } else if (e.key === 'Escape') {
+        setPreviewFile(null);
+        setPreviewImageError(false);
+        setPreviewImageLoading(true);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [previewFile, navigateImage]);
+  
+  // Timeout para preview que não carrega
+  useEffect(() => {
+    if (!previewFile || !previewImageLoading) return;
+    
+    const timeout = setTimeout(() => {
+      console.warn('Timeout ao carregar preview - verificando...');
+      // Verificar se a imagem realmente falhou ou está apenas demorando
+      const img = document.querySelector('.preview-image') as HTMLImageElement;
+      if (img && !img.complete) {
+        console.warn('Imagem ainda carregando após 10 segundos');
+        // Tentar recarregar
+        const currentSrc = img.src;
+        img.src = '';
+        setTimeout(() => {
+          img.src = currentSrc.split('&t=')[0] + '&t=' + Date.now();
+        }, 100);
+      }
+    }, 10000); // 10 segundos
+    
+    return () => clearTimeout(timeout);
+  }, [previewFile, previewImageLoading]);
 
   useEffect(() => {
     // Verificar autenticação ao carregar
@@ -317,52 +400,99 @@ export default function DatabasePage() {
     }
   };
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpload = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!user) return;
+
+    if (uploadFiles.length === 0) {
+      setError('Selecione pelo menos um arquivo');
+      return;
+    }
 
     setLoading(true);
     setError('');
+    setUploadProgress({});
 
     try {
-      const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
+      // Definir pasta efetiva para upload - usar a pasta atual
+      let folder: string = currentFolder || '*';
       
-      if (!fileInput?.files || fileInput.files.length === 0) {
-        setError('Selecione pelo menos um arquivo');
-        setLoading(false);
-        return;
-      }
-
-      // Definir pasta efetiva para upload
-      let folder: string;
-      if (user.role === 'user') {
-        folder = user.folder || '*';
-      } else {
-        folder = currentFolder || '*';
-      }
-
-      // Upload de cada arquivo (sem metadata adicional)
-      for (const file of Array.from(fileInput.files)) {
-        const response = await api.uploadFile(file, folder);
-
-        if (response.error) {
-          setError(response.error);
-          break;
+      // Para usuários, garantir que a pasta está dentro da pasta base do usuário
+      if (user.role === 'user' && user.folder) {
+        const baseFolder = user.folder;
+        // Se currentFolder for '*', usar a pasta base do usuário
+        if (folder === '*') {
+          folder = baseFolder;
+        } else if (!folder.startsWith(baseFolder + '/') && folder !== baseFolder) {
+          // Se a pasta atual não começar com a pasta base, usar a pasta base
+          folder = baseFolder;
         }
+        // Se folder já começa com baseFolder, usar diretamente (permite subpastas)
       }
+      
+      console.log('Upload - Pasta selecionada:', folder, 'CurrentFolder:', currentFolder, 'User folder:', user.folder);
 
-      if (!error) {
-        setShowUploadModal(false);
-        // Limpar input de arquivo
-        if (fileInput) {
-          fileInput.value = '';
+      // Upload de cada arquivo com progresso
+      const uploadPromises = uploadFiles.map(async (file) => {
+        const fileName = file.name;
+        setUploadProgress(prev => ({ ...prev, [fileName]: 0 }));
+        
+        try {
+          const response = await api.uploadFile(file, folder);
+          
+          if (response.error) {
+            setUploadProgress(prev => ({ ...prev, [fileName]: -1 })); // -1 = erro
+            throw new Error(response.error);
+          }
+          
+          setUploadProgress(prev => ({ ...prev, [fileName]: 100 }));
+          return response;
+        } catch (err: any) {
+          setUploadProgress(prev => ({ ...prev, [fileName]: -1 }));
+          throw err;
         }
-        await loadFiles(); // Recarregar lista
-      }
+      });
+
+      await Promise.all(uploadPromises);
+
+      // Limpar e recarregar
+      setUploadFiles([]);
+      setUploadProgress({});
+      setShowUploadModal(false);
+      await loadFiles(); // Recarregar lista
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer upload');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadFiles(Array.from(files));
+    setError('');
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files);
     }
   };
 
@@ -588,6 +718,52 @@ export default function DatabasePage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {selectedFiles.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">
+                    {selectedFiles.size} arquivo(s) selecionado(s)
+                  </span>
+                  <button
+                    onClick={async () => {
+                      // Fazer download de todos os arquivos selecionados
+                      const filesToDownload = files.filter(f => selectedFiles.has(f.id));
+                      for (const file of filesToDownload) {
+                        try {
+                          const response = await fetch(`/api/download-file.php?id=${file.id}`, {
+                            credentials: 'include'
+                          });
+                          if (response.ok) {
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = file.name;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                            // Pequeno delay entre downloads para evitar bloqueio do navegador
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                          }
+                        } catch (error) {
+                          console.error(`Erro ao fazer download de ${file.name}:`, error);
+                        }
+                      }
+                      setSelectedFiles(new Set());
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <Download size={16} />
+                    Baixar Selecionados ({selectedFiles.size})
+                  </button>
+                  <button
+                    onClick={() => setSelectedFiles(new Set())}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Limpar Seleção
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <UserIcon size={16} />
                 <div>
@@ -804,9 +980,24 @@ export default function DatabasePage() {
                               setCurrentFolder(folderPath);
                             }
                           } else if (user?.role === 'user') {
+                            // Para usuários, usar currentFolder atual (que já inclui a pasta base do usuário)
+                            // Se currentFolder for igual à pasta base do usuário ou '*', começar da pasta base
                             const baseFolder = user.folder || '*';
-                            const newPath = baseFolder === '*' ? file.name : `${baseFolder}/${file.name}`;
-                            setCurrentFolder(newPath);
+                            const currentPath = currentFolder === '*' ? baseFolder : currentFolder;
+                            
+                            // Verificar se já estamos na pasta base ou em uma subpasta
+                            if (currentPath === baseFolder || currentPath.startsWith(baseFolder + '/')) {
+                              // Estamos dentro da pasta do usuário, adicionar a nova pasta ao caminho atual
+                              const newPath = currentPath === baseFolder ? `${baseFolder}/${file.name}` : `${currentPath}/${file.name}`;
+                              // Verificar se não está duplicando
+                              if (!newPath.endsWith(`/${file.name}/${file.name}`)) {
+                                setCurrentFolder(newPath);
+                              }
+                            } else {
+                              // Se não, começar da pasta base
+                              const newPath = baseFolder === '*' ? file.name : `${baseFolder}/${file.name}`;
+                              setCurrentFolder(newPath);
+                            }
                           }
                         }}
                         className="group bg-black border-2 border-black rounded-lg overflow-hidden hover:bg-gray-900 hover:border-gray-700 transition-all duration-300 hover:shadow-2xl cursor-pointer transform hover:-translate-y-1"
@@ -822,14 +1013,81 @@ export default function DatabasePage() {
                   }
                   
                   // Card de Arquivo - Design original
+                  const isSelected = selectedFiles.has(file.id);
                   return (
-                    <div key={file.id} className="group bg-white border-2 border-gray-200 rounded-xl overflow-hidden hover:border-black transition-all duration-300 hover:shadow-xl">
+                    <div 
+                      key={file.id} 
+                      className={`group bg-white border-2 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer ${
+                        isSelected ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200 hover:border-black'
+                      }`}
+                      onClick={(e) => {
+                        // Se clicar no checkbox, não abrir modal
+                        if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                          return;
+                        }
+                        
+                        // Se for imagem, abrir modal de visualização
+                        const isImage = (file as any).mimeType?.startsWith('image/');
+                        if (isImage && file.url) {
+                          setPreviewImageError(false);
+                          setPreviewImageLoading(true);
+                          setPreviewFile(file);
+                        }
+                      }}
+                    >
                       <div className="relative aspect-square overflow-hidden bg-gray-100">
-                        {file.url ? (
+                        {/* Checkbox para seleção múltipla */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newSelected = new Set(selectedFiles);
+                              if (e.target.checked) {
+                                newSelected.add(file.id);
+                              } else {
+                                newSelected.delete(file.id);
+                              }
+                              setSelectedFiles(newSelected);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </div>
+                        {file.url && (file as any).mimeType?.startsWith('image/') ? (
                           <img 
                             src={file.url} 
                             alt={file.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            onError={(e) => {
+                              // Se falhar, tentar usar viewLink ou downloadLink
+                              const target = e.target as HTMLImageElement;
+                              const fallbackUrl = (file as any).downloadLink || (file as any).viewLink;
+                              if (fallbackUrl && target.src !== fallbackUrl) {
+                                console.error('Erro ao carregar miniatura, tentando fallback:', fallbackUrl);
+                                target.src = fallbackUrl;
+                              } else {
+                                console.error('Erro ao carregar miniatura e nenhum fallback disponível', {
+                                  id: file.id,
+                                  url: file.url,
+                                  downloadLink: (file as any).downloadLink,
+                                  viewLink: (file as any).viewLink
+                                });
+                                // Mostrar placeholder de erro
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent && !parent.querySelector('.error-placeholder')) {
+                                  const placeholder = document.createElement('div');
+                                  placeholder.className = 'error-placeholder w-full h-full flex items-center justify-center bg-gray-200 text-gray-400';
+                                  placeholder.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+                                  parent.appendChild(placeholder);
+                                }
+                              }
+                            }}
+                            onLoad={() => {
+                              console.log('Miniatura carregada com sucesso');
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -839,23 +1097,55 @@ export default function DatabasePage() {
                         <div className="absolute top-2 right-2 opacity-0 md:group-hover:opacity-100 transition-opacity md:opacity-0">
                           <div className="flex gap-2">
                             {file.url && (
-                              <a 
-                                href={file.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const isImage = (file as any).mimeType?.startsWith('image/');
+                                  if (isImage) {
+                                    setPreviewImageError(false);
+                                    setPreviewImageLoading(true);
+                                    setPreviewFile(file);
+                                  } else {
+                                    // Se não for imagem, abrir em nova aba
+                                    window.open(file.url, '_blank', 'noopener,noreferrer');
+                                  }
+                                }}
                                 className="p-2.5 md:p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
                                 <Eye size={18} className="text-black md:w-4 md:h-4" />
-                              </a>
+                              </button>
                             )}
                             {file.url && (
-                              <a 
-                                href={file.url} 
-                                download
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  // Fazer download via fetch para não abrir nova aba
+                                  try {
+                                    const response = await fetch(`/api/download-file.php?id=${file.id}`, {
+                                      credentials: 'include'
+                                    });
+                                    if (response.ok) {
+                                      const blob = await response.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = file.name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      window.URL.revokeObjectURL(url);
+                                    } else {
+                                      console.error('Erro ao fazer download');
+                                    }
+                                  } catch (error) {
+                                    console.error('Erro ao fazer download:', error);
+                                  }
+                                }}
                                 className="p-2.5 md:p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
                                 <Download size={18} className="text-black md:w-4 md:h-4" />
-                              </a>
+                              </button>
                             )}
                             {canDelete && (
                               <button 
@@ -871,14 +1161,16 @@ export default function DatabasePage() {
                         <div className="md:hidden absolute top-2 right-2">
                           <div className="flex gap-2">
                             {file.url && (
-                              <a 
-                                href={file.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={() => {
+                                  setPreviewImageError(false);
+                                  setPreviewImageLoading(true);
+                                  setPreviewFile(file);
+                                }}
                                 className="p-2.5 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
                               >
                                 <Eye size={18} className="text-black" />
-                              </a>
+                              </button>
                             )}
                             {file.url && (
                               <a 
@@ -1024,52 +1316,322 @@ export default function DatabasePage() {
       )}
 
       {/* Modal de Upload */}
-      <Modal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Upload de Arquivos">
+      <Modal isOpen={showUploadModal} onClose={() => {
+        setShowUploadModal(false);
+        setUploadFiles([]);
+        setUploadProgress({});
+        setError('');
+      }} title="Upload de Arquivos">
         <form onSubmit={handleUpload} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Selecionar Arquivos</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-black transition-colors">
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging 
+                  ? 'border-black bg-gray-50' 
+                  : 'border-gray-300 hover:border-black'
+              }`}
+            >
               <input 
                 type="file" 
                 name="files" 
                 multiple 
                 accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" 
-                required 
                 className="hidden" 
                 id="file-upload"
+                onChange={(e) => handleFileSelect(e.target.files)}
               />
               <label htmlFor="file-upload" className="cursor-pointer block">
-                <ImageIcon size={48} className="mx-auto text-gray-400 mb-3" />
-                <p className="text-base font-medium text-gray-700 mb-1">Clique para selecionar arquivos</p>
+                <ImageIcon size={48} className={`mx-auto mb-3 ${isDragging ? 'text-black' : 'text-gray-400'}`} />
+                <p className="text-base font-medium text-gray-700 mb-1">
+                  {isDragging ? 'Solte os arquivos aqui' : 'Clique para selecionar arquivos'}
+                </p>
                 <p className="text-sm text-gray-500 mb-3">ou arraste e solte aqui</p>
                 <p className="text-xs text-gray-400">Formatos: Imagens, Vídeos, PDF, Documentos (máx. 100MB por arquivo)</p>
               </label>
             </div>
+            
+            {/* Lista de arquivos selecionados */}
+            {uploadFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  {uploadFiles.length} arquivo(s) selecionado(s):
+                </p>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {uploadFiles.map((file, index) => {
+                    const progress = uploadProgress[file.name];
+                    const isError = progress === -1;
+                    const isComplete = progress === 100;
+                    
+                    return (
+                      <div 
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-700 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <div className="ml-3 flex items-center gap-2">
+                          {loading && progress !== undefined && (
+                            <>
+                              {isError ? (
+                                <span className="text-red-500 text-xs">Erro</span>
+                              ) : isComplete ? (
+                                <CheckCircle className="text-green-500" size={20} />
+                              ) : (
+                                <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-black transition-all duration-300"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {!loading && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadFiles(prev => prev.filter((_, i) => i !== index));
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
+          
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           
           <div className="flex gap-3 pt-2">
             <button 
               type="button" 
               onClick={() => {
                 setShowUploadModal(false);
-                const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-                if (fileInput) fileInput.value = '';
+                setUploadFiles([]);
+                setUploadProgress({});
+                setError('');
               }} 
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              disabled={loading}
             >
               Cancelar
             </button>
             <button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || uploadFiles.length === 0}
               className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Upload size={16} />
-              {loading ? 'Enviando...' : 'Fazer Upload'}
+              {loading ? 'Enviando...' : `Fazer Upload (${uploadFiles.length})`}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Modal de Visualização de Imagem - Flutuante */}
+      {previewFile && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setPreviewFile(null);
+            setPreviewImageError(false);
+            setPreviewImageLoading(true);
+          }}
+        >
+          <div 
+            className="relative max-w-7xl max-h-[95vh] w-full h-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Botão Fechar */}
+            <button
+              onClick={() => {
+                setPreviewFile(null);
+                setPreviewImageError(false);
+                setPreviewImageLoading(true);
+              }}
+              className="absolute top-4 right-4 z-10 p-3 bg-black/70 hover:bg-black/90 text-white rounded-full transition-colors backdrop-blur-sm"
+            >
+              <X size={24} />
+            </button>
+            
+            {/* Setas de Navegação */}
+            {getImageFiles().length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateImage('prev');
+                  }}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/70 hover:bg-black/90 text-white rounded-full transition-colors backdrop-blur-sm"
+                  aria-label="Imagem anterior"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateImage('next');
+                  }}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/70 hover:bg-black/90 text-white rounded-full transition-colors backdrop-blur-sm"
+                  aria-label="Próxima imagem"
+                >
+                  <ArrowRight size={24} />
+                </button>
+              </>
+            )}
+            
+            {/* Imagem */}
+            <div className="relative w-full h-full flex items-center justify-center">
+              {previewFile.mimeType?.startsWith('image/') ? (
+                <>
+                  {previewImageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                  {previewImageError ? (
+                    <div className="text-white text-center p-8">
+                      <p className="text-lg mb-2">Erro ao carregar imagem</p>
+                      <p className="text-sm opacity-75 mb-4">{previewFile.name}</p>
+                      <button
+                        onClick={() => {
+                          setPreviewImageError(false);
+                          setPreviewImageLoading(true);
+                          // Forçar recarregamento da imagem
+                          const img = document.querySelector('.preview-image') as HTMLImageElement;
+                          if (img) {
+                            img.src = `/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`;
+                          }
+                        }}
+                        className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100 transition-colors text-sm"
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  ) : (
+                    <img 
+                      key={`${previewFile.id}-${Date.now()}`}
+                      src={`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`}
+                      alt={previewFile.name}
+                      className="preview-image max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                      onError={async (e) => {
+                        console.error('Erro ao carregar imagem no modal', {
+                          fileId: previewFile.id,
+                          url: (e.target as HTMLImageElement).src
+                        });
+                        const target = e.target as HTMLImageElement;
+                        setPreviewImageLoading(false);
+                        setPreviewImageError(true);
+                        
+                        // Tentar verificar se o problema é de autenticação
+                        try {
+                          const response = await fetch(`/api/view-file.php?id=${previewFile.id}`, {
+                            credentials: 'include'
+                          });
+                          const contentType = response.headers.get('content-type');
+                          console.log('Resposta do servidor:', {
+                            status: response.status,
+                            contentType: contentType,
+                            ok: response.ok
+                          });
+                          if (!response.ok) {
+                            const errorData = await response.json().catch(() => null);
+                            console.error('Erro do servidor:', response.status, errorData);
+                          } else if (contentType && contentType.startsWith('image/')) {
+                            // Se a resposta é uma imagem, tentar usar blob URL
+                            const blob = await response.blob();
+                            const blobUrl = window.URL.createObjectURL(blob);
+                            target.src = blobUrl;
+                            setPreviewImageError(false);
+                            setPreviewImageLoading(false);
+                          }
+                        } catch (fetchError) {
+                          console.error('Erro ao verificar URL:', fetchError);
+                        }
+                      }}
+                      onLoad={() => {
+                        console.log('Imagem carregada com sucesso no modal');
+                        setPreviewImageLoading(false);
+                        setPreviewImageError(false);
+                      }}
+                      onLoadStart={() => {
+                        console.log('Iniciando carregamento da imagem');
+                        setPreviewImageLoading(true);
+                      }}
+                      style={{ display: previewImageLoading ? 'none' : 'block' }}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="text-white text-center p-8">
+                  <p className="text-lg mb-2">Arquivo não é uma imagem</p>
+                  <p className="text-sm opacity-75">{previewFile.name}</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Informações na parte inferior */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-6 py-3 rounded-lg">
+              <p className="text-sm font-medium text-center">{previewFile.name}</p>
+              {getImageFiles().length > 1 && (
+                <p className="text-xs text-center mt-1 opacity-75">
+                  {getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}
+                </p>
+              )}
+              <div className="flex gap-3 mt-2 justify-center">
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    // Fazer download via fetch para não abrir nova aba
+                    try {
+                      const response = await fetch(`/api/download-file.php?id=${previewFile.id}`, {
+                        credentials: 'include'
+                      });
+                      if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = previewFile.name;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                      } else {
+                        console.error('Erro ao fazer download');
+                      }
+                    } catch (error) {
+                      console.error('Erro ao fazer download:', error);
+                    }
+                  }}
+                  className="px-4 py-1.5 border border-white text-white rounded hover:bg-white/10 transition-colors text-sm"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </>
   );
