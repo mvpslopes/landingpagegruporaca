@@ -102,6 +102,26 @@ function hasPermission($user, $action, $folder = null) {
         return true;
     }
     
+    // VIEWER - pode ver todas as pastas, baixar, fazer upload, mas não pode deletar nem gerenciar
+    if ($role === 'viewer') {
+        // VIEWER não pode deletar
+        if ($action === 'delete') {
+            return false;
+        }
+        
+        // VIEWER não pode gerenciar usuários
+        if ($action === 'manage_users' || $action === 'manage_permissions') {
+            return false;
+        }
+        
+        // VIEWER pode fazer upload, baixar e visualizar
+        if ($action === 'upload' || $action === 'download' || $action === 'view_all') {
+            return true;
+        }
+        
+        return false;
+    }
+    
     // USER - verificar permissões específicas
     if ($role === 'user') {
         // USER não pode deletar
@@ -114,10 +134,13 @@ function hasPermission($user, $action, $folder = null) {
             return false;
         }
         
-        // USER só acessa sua própria pasta
+        // USER só acessa sua própria pasta e subpastas
         $userFolder = $user['folder'] ?? '';
-        if ($folder && $folder !== $userFolder && $folder !== '*') {
-            return false;
+        if ($folder && $folder !== '*' && $folder !== $userFolder) {
+            // Verificar se é uma subpasta dentro da pasta do usuário
+            if (!$userFolder || strpos($folder, $userFolder . '/') !== 0) {
+                return false;
+            }
         }
         
         // Verificar permissão específica
@@ -139,14 +162,21 @@ function canAccessFolder($user, $folder) {
     $role = $user['role'] ?? 'user';
     $userFolder = $user['folder'] ?? '';
     
-    // ROOT e ADMIN acessam todas as pastas
-    if ($role === 'root' || $role === 'admin') {
+    // ROOT, ADMIN e VIEWER acessam todas as pastas
+    if ($role === 'root' || $role === 'admin' || $role === 'viewer') {
         return true;
     }
     
-    // USER só acessa sua própria pasta
+    // USER só acessa sua própria pasta e subpastas
     if ($role === 'user') {
-        return $folder === $userFolder || $folder === '*';
+        if ($folder === '*' || $folder === $userFolder) {
+            return true;
+        }
+        // Permitir acesso a subpastas dentro da pasta do usuário
+        if ($userFolder && strpos($folder, $userFolder . '/') === 0) {
+            return true;
+        }
+        return false;
     }
     
     return false;
@@ -182,6 +212,15 @@ function createUser($rootUser, $userData) {
                 'manage_users' => false,
                 'manage_permissions' => false
             ];
+        } elseif ($userData['role'] === 'viewer') {
+            $permissions = [
+                'upload' => true,
+                'download' => true,
+                'delete' => false,
+                'view_all' => true,
+                'manage_users' => false,
+                'manage_permissions' => false
+            ];
         } elseif ($userData['role'] === 'admin') {
             $permissions = [
                 'upload' => true,
@@ -196,6 +235,18 @@ function createUser($rootUser, $userData) {
         // Hash da senha
         $passwordHash = password_hash($userData['password'], PASSWORD_BCRYPT);
         
+        // Se for usuário "user" e não tiver pasta definida, gerar automaticamente a partir do email
+        $userFolder = $userData['folder'] ?? '';
+        if (($userData['role'] ?? 'user') === 'user' && empty($userFolder)) {
+            // Extrair a parte antes do @ do email
+            $emailPrefix = explode('@', $userData['email'])[0];
+            // Remover caracteres especiais e converter para MAIÚSCULAS
+            $userFolder = strtoupper(preg_replace('/[^a-z0-9]/', '', $emailPrefix));
+        } else if (!empty($userFolder)) {
+            // Se a pasta foi fornecida, garantir que está em maiúsculas
+            $userFolder = strtoupper(trim($userFolder));
+        }
+        
         // Inserir usuário
         $stmt = $conn->prepare("
             INSERT INTO users (email, password, name, role, folder, permissions, created_by)
@@ -207,7 +258,7 @@ function createUser($rootUser, $userData) {
             $passwordHash,
             $userData['name'],
             $userData['role'] ?? 'user',
-            $userData['folder'] ?? '',
+            $userFolder,
             json_encode($permissions),
             $rootUser['id']
         ]);
@@ -217,6 +268,37 @@ function createUser($rootUser, $userData) {
         // Buscar usuário criado
         $newUser = getUserById($userId);
         unset($newUser['password']);
+        
+        // Criar pasta raiz no Google Drive se o usuário tiver uma pasta definida
+        // (userFolder já foi definido acima, pode ser gerado automaticamente ou fornecido)
+        if ($userData['role'] === 'user' && !empty($userFolder) && $userFolder !== '*') {
+            try {
+                require_once __DIR__ . '/drive_service.php';
+                require_once __DIR__ . '/oauth_token_storage.php';
+                
+                $oauthToken = OAuthTokenStorage::loadToken();
+                if ($oauthToken) {
+                    $driveService = new DriveService($oauthToken);
+                    
+                    // Verificar se a pasta já existe
+                    $existingFolderId = $driveService->getFolderIdByName($userFolder, $driveService->getRootFolderId());
+                    
+                    if (!$existingFolderId) {
+                        // Criar a pasta na raiz do Google Drive
+                        $folderId = $driveService->createFolder($userFolder, $driveService->getRootFolderId());
+                        error_log("Pasta raiz criada automaticamente para usuário {$userData['email']}: {$userFolder} (ID: {$folderId})");
+                    } else {
+                        error_log("Pasta raiz já existe para usuário {$userData['email']}: {$userFolder}");
+                    }
+                } else {
+                    error_log("Aviso: Token OAuth não encontrado. Pasta raiz não foi criada para {$userData['email']}");
+                }
+            } catch (Exception $e) {
+                // Não falhar a criação do usuário se houver erro ao criar a pasta
+                // A pasta pode ser criada manualmente depois
+                error_log("Erro ao criar pasta raiz para {$userData['email']}: " . $e->getMessage());
+            }
+        }
         
         // Log de auditoria
         logAudit($rootUser['id'], 'create_user', 'user', $userId, [

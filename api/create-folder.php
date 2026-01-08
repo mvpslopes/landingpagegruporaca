@@ -11,7 +11,7 @@ $user = requireAuth();
 
 // Função para converter pasta do usuário para caminho do Google Drive
 function convertUserFolderToDrivePath($user, $folder) {
-    // Se for ROOT ou ADMIN, pode acessar qualquer pasta
+    // Se for ROOT ou ADMIN, pode acessar qualquer pasta (VIEWER não pode criar pastas)
     if ($user['role'] === 'root' || $user['role'] === 'admin') {
         if ($folder === '*') {
             return '*'; // Pasta raiz (GRUPO_RACA)
@@ -25,8 +25,15 @@ function convertUserFolderToDrivePath($user, $folder) {
         if ($userFolder === '*') {
             return '*';
         }
-        // Se o usuário especificou uma subpasta, adicionar à pasta dele
+        
+        // Se o folder já começa com a pasta do usuário, usar diretamente
         if ($folder !== '*' && $folder !== $userFolder) {
+            // Verificar se o folder já começa com userFolder
+            if (strpos($folder, $userFolder . '/') === 0) {
+                // Já está no formato correto, usar diretamente
+                return $folder;
+            }
+            // Se não começa, adicionar a pasta do usuário
             return $userFolder . '/' . ltrim($folder, '/');
         }
         return $userFolder;
@@ -70,9 +77,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Validar nome da pasta (sem caracteres especiais perigosos)
-        if (preg_match('/[<>:"|?*\\\\]/', $folderName)) {
-            jsonError('Nome da pasta contém caracteres inválidos', 400);
+        // Não permitir nome "*" pois é reservado para a raiz
+        if ($folderName === '*' || preg_match('/[<>:"|?*\\\\]/', $folderName)) {
+            jsonError('Nome da pasta contém caracteres inválidos. O nome "*" é reservado para a raiz.', 400);
         }
+        
+        // Validar que o nome não está vazio após trim
+        if (empty($folderName)) {
+            jsonError('Nome da pasta não pode ser vazio', 400);
+        }
+        
+        // Validar que não há letras minúsculas
+        if (preg_match('/[a-z]/', $folderName)) {
+            jsonError('O nome da pasta deve estar em MAIÚSCULAS. Letras minúsculas não são permitidas.', 400);
+        }
+        
+        // Converter nome da pasta para maiúsculas (garantir)
+        $folderName = strtoupper($folderName);
         
         // Verificar permissão de upload (necessária para criar pastas)
         if (!hasPermission($user, 'upload', $parentFolder)) {

@@ -5,10 +5,36 @@
  * Para USER: lista apenas sua pasta
  */
 
-// Limpar qualquer output anterior
-if (ob_get_level() > 0) {
-    ob_clean();
+// Desabilitar exibição de erros e warnings
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Iniciar output buffering ANTES de qualquer coisa
+if (ob_get_level() == 0) {
+    ob_start();
+} else {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    ob_start();
 }
+
+// Capturar erros fatais
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
+        ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode([
+            'error' => 'Erro fatal: ' . $error['message'],
+            'file' => $error['file'],
+            'line' => $error['line']
+        ]);
+        exit;
+    }
+});
 
 require_once 'config.php';
 require_once 'permissions_db.php';
@@ -43,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $folders = [];
         
-        // Se for ROOT ou ADMIN, listar todas as pastas da raiz do Google Drive
-        if ($user['role'] === 'root' || $user['role'] === 'admin') {
+        // Se for ROOT, ADMIN ou VIEWER, listar todas as pastas da raiz do Google Drive
+        if ($user['role'] === 'root' || $user['role'] === 'admin' || $user['role'] === 'viewer') {
             // Adicionar opção "Todas" primeiro
             $folders[] = [
                 'id' => '*',
@@ -54,8 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             
             // Tentar listar pastas do Google Drive (opcional - se falhar, retorna apenas "Todas")
             try {
-                // Listar arquivos da raiz do Google Drive
-                $allFiles = $driveService->listFiles('', true);
+                // Listar arquivos da raiz do Google Drive (usar '*' para raiz)
+                $allFiles = $driveService->listFiles('*', true);
                 
                 // Extrair nomes únicos de pastas (primeiro nível)
                 $folderNames = [];
@@ -63,7 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     foreach ($allFiles as $item) {
                         if (isset($item['type']) && $item['type'] === 'folder') {
                             $folderName = $item['name'] ?? '';
-                            if (!empty($folderName) && !in_array($folderName, $folderNames)) {
+                            // Filtrar pastas com nome "*" ou vazio
+                            // Normalizar para maiúsculas para consistência
+                            $folderName = strtoupper(trim($folderName));
+                            if (!empty($folderName) && $folderName !== '*' && !in_array($folderName, $folderNames)) {
                                 $folderNames[] = $folderName;
                             }
                         }
@@ -90,6 +119,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             } catch (Exception $e) {
                 // Se houver erro ao listar do Google Drive, continuar com apenas "Todas"
                 error_log('Erro ao listar pastas do Google Drive: ' . $e->getMessage());
+                error_log('Stack trace: ' . $e->getTraceAsString());
+                // Já temos "Todas" na lista, então apenas continuar
+            } catch (Error $e) {
+                // Capturar erros fatais também
+                error_log('Erro fatal ao listar pastas do Google Drive: ' . $e->getMessage());
+                error_log('Arquivo: ' . $e->getFile() . ' Linha: ' . $e->getLine());
                 error_log('Stack trace: ' . $e->getTraceAsString());
                 // Já temos "Todas" na lista, então apenas continuar
             }
@@ -123,6 +158,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             ]];
         }
         
+        // Limpar qualquer output antes de enviar JSON
+        ob_clean();
+        
         jsonResponse([
             'folders' => $folders,
             'userRole' => $user['role']
@@ -130,6 +168,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } catch (Exception $e) {
         error_log('Erro ao listar pastas: ' . $e->getMessage());
         error_log('Stack trace: ' . $e->getTraceAsString());
+        
+        // Limpar qualquer output antes de enviar JSON
+        ob_clean();
         
         // Em caso de erro, retornar pelo menos "Todas"
         jsonResponse([
@@ -140,6 +181,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             ]],
             'userRole' => $user['role'] ?? 'user',
             'error' => 'Erro ao carregar pastas: ' . $e->getMessage()
+        ]);
+    } catch (Error $e) {
+        error_log('Erro fatal ao listar pastas: ' . $e->getMessage());
+        error_log('Arquivo: ' . $e->getFile() . ' Linha: ' . $e->getLine());
+        error_log('Stack trace: ' . $e->getTraceAsString());
+        
+        // Limpar qualquer output antes de enviar JSON
+        ob_clean();
+        
+        // Em caso de erro fatal, retornar pelo menos "Todas"
+        jsonResponse([
+            'folders' => [[
+                'id' => '*',
+                'name' => 'Todas',
+                'path' => '*'
+            ]],
+            'userRole' => $user['role'] ?? 'user',
+            'error' => 'Erro fatal ao carregar pastas: ' . $e->getMessage()
         ]);
     }
 }

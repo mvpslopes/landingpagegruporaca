@@ -8,7 +8,7 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: 'root' | 'admin' | 'user';
+  role: 'root' | 'admin' | 'viewer' | 'user';
   folder: string;
   permissions: {
     upload: boolean;
@@ -145,7 +145,7 @@ export async function createUser(userData: {
   email: string;
   password: string;
   name: string;
-  role: 'root' | 'admin' | 'user';
+  role: 'root' | 'admin' | 'viewer' | 'user';
   folder?: string;
 }): Promise<ApiResponse<User>> {
   try {
@@ -287,6 +287,52 @@ export async function deleteFile(fileId: string, folder: string): Promise<ApiRes
     return data;
   } catch (error: any) {
     return { error: error.message || 'Erro ao deletar arquivo' };
+  }
+}
+
+export async function renameFile(fileId: string, newName: string, folder: string, type: 'file' | 'folder'): Promise<ApiResponse<FileItem>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/files.php`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ id: fileId, name: newName, folder, type }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao renomear');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao renomear' };
+  }
+}
+
+export async function moveFile(fileId: string, fromFolder: string, toFolder: string, type: 'file' | 'folder'): Promise<ApiResponse<FileItem>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/files.php`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ id: fileId, fromFolder, toFolder, type }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao mover arquivo');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao mover arquivo' };
   }
 }
 

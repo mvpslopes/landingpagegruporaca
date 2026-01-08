@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   LogIn, X, Search, Upload, Eye, Download, Trash2, 
-  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, CheckCircle
+  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, CheckCircle, FileText, Video, Music, Grid3x3, List, Edit2, Move
 } from 'lucide-react';
 import Loading from './Loading';
 import Modal from './Modal';
+import ToastContainer, { type Toast } from './Toast';
 import * as api from '../lib/api';
 import type { User, FileItem } from '../lib/api';
 
@@ -38,6 +39,25 @@ export default function DatabasePage() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [previewImageError, setPreviewImageError] = useState(false);
   const [previewImageLoading, setPreviewImageLoading] = useState(true);
+  const [previewImageBlobUrl, setPreviewImageBlobUrl] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ fileId: string; folder: string; fileName: string } | null>(null);
+  const [fileTypeFilter, setFileTypeFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showRenameModal, setShowRenameModal] = useState<{ file: FileItem; type: 'file' | 'folder' } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [showMoveModal, setShowMoveModal] = useState<{ file: FileItem } | null>(null);
+  
+  // Função helper para adicionar toast
+  const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration?: number) => {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type, duration }]);
+  }, []);
+
+  // Função helper para remover toast
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
   
   // Função para obter lista de imagens filtradas
   const getImageFiles = useCallback(() => {
@@ -65,55 +85,177 @@ export default function DatabasePage() {
     
     const newFile = imageFiles[newIndex];
     if (newFile) {
+      // Limpar blob URL anterior
+      if (previewImageBlobUrl) {
+        window.URL.revokeObjectURL(previewImageBlobUrl);
+        setPreviewImageBlobUrl(null);
+      }
       setPreviewImageError(false);
       setPreviewImageLoading(true);
       setPreviewFile(newFile);
     }
-  }, [previewFile, getImageFiles]);
+  }, [previewFile, getImageFiles, previewImageBlobUrl]);
   
-  // Adicionar listeners de teclado para navegação
+  // Adicionar listeners de teclado para navegação e atalhos
   useEffect(() => {
-    if (!previewFile) return;
-    
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
+      // Se estiver em um input ou textarea, não processar atalhos
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Apenas processar Escape para fechar modais
+        if (e.key === 'Escape') {
+          if (previewFile) {
+            if (previewImageBlobUrl) {
+              window.URL.revokeObjectURL(previewImageBlobUrl);
+              setPreviewImageBlobUrl(null);
+            }
+            setPreviewFile(null);
+            setPreviewImageError(false);
+            setPreviewImageLoading(true);
+          } else if (showUploadModal) {
+            setShowUploadModal(false);
+          } else if (showCreateFolderModal) {
+            setShowCreateFolderModal(false);
+          } else if (showDeleteConfirm) {
+            setShowDeleteConfirm(null);
+          } else if (showRenameModal) {
+            setShowRenameModal(null);
+          } else if (showMoveModal) {
+            setShowMoveModal(null);
+          }
+        }
+        return;
+      }
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Atalhos globais
+      if (ctrlKey && e.key === 'u' && !showUploadModal && !showCreateFolderModal) {
         e.preventDefault();
-        navigateImage('prev');
-      } else if (e.key === 'ArrowRight') {
+        setShowUploadModal(true);
+      } else if (ctrlKey && e.key === 'n' && !showUploadModal && !showCreateFolderModal) {
         e.preventDefault();
-        navigateImage('next');
+        setShowCreateFolderModal(true);
+      } else if (e.key === 'Delete' && selectedFiles.size > 0 && !showDeleteConfirm) {
+        e.preventDefault();
+        // Deletar primeiro arquivo selecionado
+        const firstSelected = Array.from(selectedFiles)[0];
+        const file = files.find(f => f.id === firstSelected);
+        if (file && user?.permissions?.delete) {
+          handleDeleteFile(file.id, file.folder, file.name);
+        }
+      } else if (ctrlKey && e.key === 'a' && !showUploadModal && !showCreateFolderModal) {
+        e.preventDefault();
+        // Selecionar todos os arquivos
+        const allFileIds = new Set(files.map(f => f.id));
+        setSelectedFiles(allFileIds);
       } else if (e.key === 'Escape') {
-        setPreviewFile(null);
-        setPreviewImageError(false);
-        setPreviewImageLoading(true);
+        // Fechar modais
+        if (previewFile) {
+          if (previewImageBlobUrl) {
+            window.URL.revokeObjectURL(previewImageBlobUrl);
+            setPreviewImageBlobUrl(null);
+          }
+          setPreviewFile(null);
+          setPreviewImageError(false);
+          setPreviewImageLoading(true);
+        } else if (showUploadModal) {
+          setShowUploadModal(false);
+        } else if (showCreateFolderModal) {
+          setShowCreateFolderModal(false);
+        } else if (showDeleteConfirm) {
+          setShowDeleteConfirm(null);
+        } else if (showRenameModal) {
+          setShowRenameModal(null);
+        } else if (showMoveModal) {
+          setShowMoveModal(null);
+        } else {
+          // Limpar seleção
+          setSelectedFiles(new Set());
+        }
+      }
+
+      // Navegação de imagens no preview
+      if (previewFile) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          navigateImage('prev');
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          navigateImage('next');
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [previewFile, navigateImage]);
-  
-  // Timeout para preview que não carrega
+  }, [previewFile, navigateImage, previewImageBlobUrl, showUploadModal, showCreateFolderModal, showDeleteConfirm, showRenameModal, showMoveModal, selectedFiles, files, user]);
+
+  // Carregar imagem usando fetch com credentials quando previewFile mudar
   useEffect(() => {
-    if (!previewFile || !previewImageLoading) return;
-    
-    const timeout = setTimeout(() => {
-      console.warn('Timeout ao carregar preview - verificando...');
-      // Verificar se a imagem realmente falhou ou está apenas demorando
-      const img = document.querySelector('.preview-image') as HTMLImageElement;
-      if (img && !img.complete) {
-        console.warn('Imagem ainda carregando após 10 segundos');
-        // Tentar recarregar
-        const currentSrc = img.src;
-        img.src = '';
-        setTimeout(() => {
-          img.src = currentSrc.split('&t=')[0] + '&t=' + Date.now();
-        }, 100);
+    if (!previewFile || !previewFile.mimeType?.startsWith('image/')) {
+      return;
+    }
+
+    // Limpar blob URL anterior
+    if (previewImageBlobUrl) {
+      window.URL.revokeObjectURL(previewImageBlobUrl);
+      setPreviewImageBlobUrl(null);
+    }
+
+    setPreviewImageLoading(true);
+    setPreviewImageError(false);
+
+    const loadImage = async () => {
+      try {
+        const response = await fetch(`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData = null;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            // Não é JSON
+          }
+          console.error('Erro ao carregar imagem:', response.status, errorData || errorText);
+          setPreviewImageLoading(false);
+          setPreviewImageError(true);
+          return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.startsWith('image/')) {
+          console.error('Resposta não é uma imagem:', contentType);
+          setPreviewImageLoading(false);
+          setPreviewImageError(true);
+          return;
+        }
+
+        // Criar blob URL
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        setPreviewImageBlobUrl(blobUrl);
+        setPreviewImageLoading(false);
+        setPreviewImageError(false);
+      } catch (error) {
+        console.error('Erro ao carregar imagem:', error);
+        setPreviewImageLoading(false);
+        setPreviewImageError(true);
       }
-    }, 10000); // 10 segundos
-    
-    return () => clearTimeout(timeout);
-  }, [previewFile, previewImageLoading]);
+    };
+
+    loadImage();
+
+    // Cleanup: revogar blob URL quando componente desmontar ou previewFile mudar
+    return () => {
+      // Não usar previewImageBlobUrl aqui pois pode estar desatualizado
+      // O cleanup será feito quando o novo previewFile for carregado
+    };
+  }, [previewFile?.id]); // Depender apenas do ID para evitar recarregamentos desnecessários
 
   useEffect(() => {
     // Verificar autenticação ao carregar
@@ -126,7 +268,7 @@ export default function DatabasePage() {
 
   // Função para verificar status OAuth
   const checkOAuthStatus = useCallback(async () => {
-    if (!user || (user.role !== 'root' && user.role !== 'admin')) {
+    if (!user || (user.role !== 'root' && user.role !== 'admin' && user.role !== 'viewer')) {
       return;
     }
 
@@ -147,7 +289,7 @@ export default function DatabasePage() {
 
   // Verificar status OAuth quando usuário estiver autenticado
   useEffect(() => {
-    if (user && (user.role === 'root' || user.role === 'admin')) {
+    if (user && (user.role === 'root' || user.role === 'admin' || user.role === 'viewer')) {
       checkOAuthStatus();
     }
   }, [user, checkOAuthStatus]);
@@ -248,18 +390,26 @@ export default function DatabasePage() {
     }
     
     console.log('loadFiles: iniciando para usuário', user.role, user.email);
+    console.log('loadFiles: currentFolder atual:', currentFolder);
     setLoading(true);
     try {
-      const baseFolder =
-        user.role === 'user'
-          ? (user.folder || '*')
-          : (currentFolder || '*');
-
-      const folder = baseFolder;
-      console.log('loadFiles: pasta base:', folder);
+      // Usar currentFolder para todos os tipos de usuário
+      // Para usuários, o currentFolder já foi ajustado no useEffect inicial
+      let folder = currentFolder || '*';
+      
+      // Para usuários, garantir que o folder comece com a pasta base do usuário
+      if (user.role === 'user' && user.folder && user.folder !== '*') {
+        // Se currentFolder é '*' ou não começa com a pasta base, usar a pasta base
+        if (folder === '*' || !folder.startsWith(user.folder)) {
+          folder = user.folder;
+        }
+        // Caso contrário, usar currentFolder (que já inclui a pasta base)
+      }
+      
+      console.log('loadFiles: pasta final a ser carregada:', folder);
       
       // Para ROOT/ADMIN, carregar pastas disponíveis do Google Drive
-      if (user.role === 'root' || user.role === 'admin') {
+      if (user.role === 'root' || user.role === 'admin' || user.role === 'viewer') {
         console.log('loadFiles: é ROOT/ADMIN, carregando pastas...');
         
         // Inicializar com "Todas" enquanto carrega
@@ -293,30 +443,42 @@ export default function DatabasePage() {
         console.log('loadFiles: não é ROOT/ADMIN, pulando carregamento de pastas');
       }
       
+      console.log('loadFiles: chamando api.getFiles com folder:', folder);
       const response = await api.getFiles(folder);
+      console.log('loadFiles: resposta recebida:', {
+        hasFiles: !!response.files,
+        filesCount: response.files?.length || 0,
+        error: response.error
+      });
       
       if (response.files) {
+        console.log('loadFiles: atualizando lista de arquivos, total:', response.files.length);
         setFiles(response.files);
 
-        // Se for USER, atualizar lista de pastas com base nos arquivos
+        // Se for USER, garantir que só veja arquivos de sua pasta
         if (user.role === 'user') {
-          const folderSet = new Set<string>();
-          response.files.forEach((file) => {
-            if (file.folder) {
-              folderSet.add(file.folder);
-            }
-          });
-          
-          let derivedFolders = Array.from(folderSet).sort();
-          derivedFolders = derivedFolders.filter((f) =>
-            f === user.folder || f.startsWith(`${user.folder}/`)
-          );
-          // Garante que a pasta base do usuário apareça
-          if (user.folder && !derivedFolders.includes(user.folder)) {
-            derivedFolders.unshift(user.folder);
+          const userFolder = user.folder || '';
+          if (userFolder && userFolder !== '*') {
+            // Filtrar arquivos para mostrar apenas os da pasta do usuário
+            const filteredFiles = response.files.filter((file: any) => {
+              const fileFolder = file.folder || '';
+              // Permitir apenas arquivos da pasta do usuário ou subpastas
+              return fileFolder === userFolder || fileFolder.startsWith(`${userFolder}/`);
+            });
+            setFiles(filteredFiles);
+            
+            // Atualizar lista de pastas apenas com a pasta do usuário e subpastas
+            const folderSet = new Set<string>();
+            folderSet.add(userFolder); // Sempre incluir a pasta base
+            filteredFiles.forEach((file: any) => {
+              if (file.folder && file.folder.startsWith(`${userFolder}/`)) {
+                folderSet.add(file.folder);
+              }
+            });
+            
+            const derivedFolders = Array.from(folderSet).sort();
+            setFolders(derivedFolders);
           }
-          
-          setFolders(derivedFolders);
         }
       } else if (response.error) {
         setError(response.error);
@@ -456,12 +618,19 @@ export default function DatabasePage() {
       await Promise.all(uploadPromises);
 
       // Limpar e recarregar
+      const successCount = uploadFiles.length;
       setUploadFiles([]);
       setUploadProgress({});
       setShowUploadModal(false);
+      addToast(`${successCount} arquivo(s) enviado(s) com sucesso`, 'success');
       await loadFiles(); // Recarregar lista
     } catch (err: any) {
-      setError(err.message || 'Erro ao fazer upload');
+      const errorCount = Object.values(uploadProgress).filter(p => p === -1).length;
+      if (errorCount > 0) {
+        addToast(`${errorCount} arquivo(s) falharam no upload`, 'error', 5000);
+      } else {
+        addToast(err.message || 'Erro ao fazer upload', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -496,20 +665,31 @@ export default function DatabasePage() {
     }
   };
 
-  const handleDeleteFile = async (fileId: string, folder: string) => {
+  const handleDeleteFile = async (fileId: string, folder: string, fileName?: string) => {
     if (!user || !user.permissions?.delete) return;
-    if (!confirm('Tem certeza que deseja deletar este arquivo?')) return;
+    
+    // Mostrar modal de confirmação
+    const file = files.find(f => f.id === fileId);
+    setShowDeleteConfirm({ fileId, folder, fileName: fileName || file?.name || 'este item' });
+  };
 
+  const confirmDelete = async () => {
+    if (!showDeleteConfirm) return;
+    
+    const { fileId, folder } = showDeleteConfirm;
     setLoading(true);
+    setShowDeleteConfirm(null);
+    
     try {
       const response = await api.deleteFile(fileId, folder);
       if (response.error) {
-        setError(response.error);
+        addToast(response.error, 'error');
       } else {
+        addToast('Arquivo deletado com sucesso', 'success');
         await loadFiles(); // Recarregar lista
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao deletar arquivo');
+      addToast(err.message || 'Erro ao deletar arquivo', 'error');
     } finally {
       setLoading(false);
     }
@@ -517,24 +697,36 @@ export default function DatabasePage() {
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFolderName.trim()) {
-      setError('Nome da pasta é obrigatório');
+    const folderName = newFolderName.trim();
+    
+    if (!folderName) {
+      addToast('Nome da pasta é obrigatório', 'warning');
       return;
     }
+
+    // Validar que não há letras minúsculas
+    if (/[a-z]/.test(folderName)) {
+      addToast('O nome da pasta deve estar em MAIÚSCULAS. Letras minúsculas não são permitidas.', 'warning');
+      return;
+    }
+
+    // Converter para maiúsculas antes de enviar
+    const folderNameUpper = folderName.toUpperCase();
 
     setLoading(true);
     setError('');
     try {
-      const response = await api.createFolder(newFolderName.trim(), currentFolder);
+      const response = await api.createFolder(folderNameUpper, currentFolder);
       if (response.error) {
-        setError(response.error);
+        addToast(response.error, 'error');
       } else {
+        addToast('Pasta criada com sucesso', 'success');
         setShowCreateFolderModal(false);
         setNewFolderName('');
         await loadFiles(); // Recarregar lista
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao criar pasta');
+      addToast(err.message || 'Erro ao criar pasta', 'error');
     } finally {
       setLoading(false);
     }
@@ -559,6 +751,34 @@ export default function DatabasePage() {
   const getFolderParts = () => {
     if (!user) return [];
     
+    // Para usuários "user", começar da pasta base
+    if (user.role === 'user') {
+      const userFolder = user.folder || '';
+      if (!userFolder) return [];
+      
+      if (currentFolder === userFolder) {
+        return [{ name: userFolder, path: userFolder }];
+      }
+      
+      // Se está em uma subpasta, criar breadcrumb a partir da pasta base
+      if (currentFolder.startsWith(userFolder + '/')) {
+        const subPath = currentFolder.substring(userFolder.length + 1);
+        const parts = subPath.split('/').filter(p => p);
+        const breadcrumb = [{ name: userFolder, path: userFolder }];
+        
+        let currentPath = userFolder;
+        parts.forEach((part) => {
+          currentPath = `${currentPath}/${part}`;
+          breadcrumb.push({ name: part, path: currentPath });
+        });
+        
+        return breadcrumb;
+      }
+      
+      return [{ name: userFolder, path: userFolder }];
+    }
+    
+    // Para ROOT/ADMIN, usar lógica original
     if (currentFolder === '*') {
       return [{ name: 'Todas', path: '*' }];
     }
@@ -577,6 +797,30 @@ export default function DatabasePage() {
 
   // Função para voltar uma pasta
   const goBackFolder = () => {
+    if (!user) return;
+    
+    // Para usuários "user", não permitir voltar além da pasta base
+    if (user.role === 'user') {
+      const userFolder = user.folder || '';
+      if (!userFolder || currentFolder === userFolder) return;
+      
+      const parts = currentFolder.split('/').filter(p => p);
+      if (parts.length > 1) {
+        // Voltar para a pasta pai, mas não além da pasta base
+        const newPath = parts.slice(0, -1).join('/');
+        if (newPath === userFolder || newPath.startsWith(userFolder + '/')) {
+          setCurrentFolder(newPath);
+        } else {
+          setCurrentFolder(userFolder);
+        }
+      } else {
+        // Voltar para pasta base
+        setCurrentFolder(userFolder);
+      }
+      return;
+    }
+    
+    // Para ROOT/ADMIN, usar lógica original
     if (currentFolder === '*') return;
     
     const parts = currentFolder.split('/').filter(p => p);
@@ -714,7 +958,7 @@ export default function DatabasePage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-black">Banco de Dados de Fotos</h1>
-                <p className="text-sm text-gray-600">Gerencie e organize fotos dos cavalos</p>
+                <p className="text-sm text-gray-600">Gerencie e organize os arquivos</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -769,7 +1013,7 @@ export default function DatabasePage() {
                 <div>
                   <span className="font-medium">{user?.name}</span>
                   <span className="ml-2 px-2 py-0.5 bg-gray-200 rounded text-xs">
-                    {user?.role === 'root' ? 'ROOT' : user?.role === 'admin' ? 'ADMIN' : 'USER'}
+                    {user?.role === 'root' ? 'ROOT' : user?.role === 'admin' ? 'ADMIN' : user?.role === 'viewer' ? 'VIEWER' : 'USER'}
                   </span>
                 </div>
               </div>
@@ -842,44 +1086,64 @@ export default function DatabasePage() {
             
             {/* Breadcrumb da Pasta Atual */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 flex-wrap">
-              {(currentFolder !== '*' && (user?.role === 'root' || user?.role === 'admin')) && (
-                <button
-                  onClick={goBackFolder}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
-                  title="Voltar para pasta anterior"
-                >
-                  <ArrowLeft size={16} />
-                  Voltar
-                </button>
-              )}
+              {(() => {
+                // Mostrar botão "Voltar" se não estiver na pasta raiz/base
+                const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin' || user?.role === 'viewer';
+                const isUserAtBase = user?.role === 'user' && currentFolder === user?.folder;
+                const canGoBack = (isRootOrAdmin && currentFolder !== '*') || (!isUserAtBase && user?.role === 'user');
+                
+                return canGoBack ? (
+                  <button
+                    onClick={goBackFolder}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
+                    title="Voltar para pasta anterior"
+                  >
+                    <ArrowLeft size={16} />
+                    Voltar
+                  </button>
+                ) : null;
+              })()}
               <Folder size={18} className="text-gray-600 flex-shrink-0" />
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium text-gray-700">Pasta atual:</span>
-                {(user?.role === 'root' || user?.role === 'admin') && currentFolder !== '*' ? (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {getFolderParts().map((part, index, array) => (
-                      <span key={part.path} className="flex items-center gap-1">
-                        <button
-                          onClick={() => setCurrentFolder(part.path)}
-                          className={`text-sm font-semibold px-2 py-1 rounded transition-colors ${
-                            index === array.length - 1
-                              ? 'text-black bg-white border border-gray-300 cursor-default'
-                              : 'text-gray-600 hover:text-black hover:bg-gray-100'
-                          }`}
-                        >
-                          {part.name}
-                        </button>
-                        {index < array.length - 1 && (
-                          <ChevronRight size={14} className="text-gray-400" />
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-sm font-semibold text-black bg-white px-3 py-1 rounded border border-gray-300">
-                    {getCurrentFolderPath()}
-                  </span>
-                )}
+                {(() => {
+                  const folderParts = getFolderParts();
+                  const hasMultipleParts = folderParts.length > 1;
+                  const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin' || user?.role === 'viewer';
+                  
+                  // Para ROOT/ADMIN, sempre mostrar breadcrumb navegável (mesmo na raiz)
+                  // Para USER, mostrar breadcrumb navegável apenas se houver múltiplas partes
+                  if (isRootOrAdmin || hasMultipleParts) {
+                    return (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {folderParts.map((part, index, array) => (
+                          <span key={part.path} className="flex items-center gap-1">
+                            <button
+                              onClick={() => setCurrentFolder(part.path)}
+                              className={`text-sm font-semibold px-2 py-1 rounded transition-colors uppercase ${
+                                index === array.length - 1
+                                  ? 'text-black bg-white border border-gray-300 cursor-default'
+                                  : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                              }`}
+                            >
+                              {part.name}
+                            </button>
+                            {index < array.length - 1 && (
+                              <ChevronRight size={14} className="text-gray-400" />
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  }
+                  
+                  // Mostrar apenas o caminho atual se não houver navegação (apenas para USER na pasta base)
+                  return (
+                    <span className="text-sm font-semibold text-black bg-white px-3 py-1 rounded border border-gray-300 uppercase">
+                      {getCurrentFolderPath()}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -909,7 +1173,7 @@ export default function DatabasePage() {
                     {folders.length > 0 ? (
                       folders.map((folder) => (
                         <option key={folder} value={folder}>
-                          {folder === '*' ? 'Todas' : folder}
+                          {folder === '*' ? 'Todas' : folder.toUpperCase()}
                         </option>
                       ))
                     ) : (
@@ -949,7 +1213,88 @@ export default function DatabasePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {/* Filtros e controles de visualização */}
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              {/* Filtro por tipo */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Filtrar:</label>
+                <select
+                  value={fileTypeFilter}
+                  onChange={(e) => setFileTypeFilter(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none text-sm"
+                >
+                  <option value="all">Todos</option>
+                  <option value="image">Imagens</option>
+                  <option value="video">Vídeos</option>
+                  <option value="document">Documentos</option>
+                  <option value="folder">Pastas</option>
+                </select>
+              </div>
+              
+              {/* Toggle visualização */}
+              <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded transition-colors ${
+                    viewMode === 'grid' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title="Visualização em grade"
+                >
+                  <Grid3x3 size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded transition-colors ${
+                    viewMode === 'list' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  title="Visualização em lista"
+                >
+                  <List size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Área de drag & drop para upload */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!isDragging) setIsDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsDragging(false);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                  handleFileSelect(files);
+                  setShowUploadModal(true);
+                }
+              }}
+              className={`mb-4 rounded-lg border-2 border-dashed transition-all ${
+                isDragging
+                  ? 'border-blue-500 bg-blue-50 p-8'
+                  : 'border-transparent'
+              }`}
+            >
+              {isDragging && (
+                <div className="text-center">
+                  <Upload size={48} className="mx-auto mb-3 text-blue-500" />
+                  <p className="text-lg font-semibold text-blue-700">Solte os arquivos aqui para fazer upload</p>
+                </div>
+              )}
+            </div>
+
+            {/* Renderização Grid ou Lista */}
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {files
                 .filter(file => 
                   file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -966,32 +1311,35 @@ export default function DatabasePage() {
                         key={file.id} 
                         onClick={() => {
                           // Navegar para dentro da pasta
-                          if (user?.role === 'root' || user?.role === 'admin') {
-                            // Evitar duplicação: se já está na pasta, não adicionar novamente
-                            const folderPath = currentFolder === '*' ? file.name : `${currentFolder}/${file.name}`;
-                            // Verificar se não está duplicando
-                            if (!folderPath.endsWith(`/${file.name}/${file.name}`)) {
-                              setCurrentFolder(folderPath);
-                            }
-                          } else if (user?.role === 'user') {
-                            // Para usuários, usar currentFolder atual (que já inclui a pasta base do usuário)
-                            // Se currentFolder for igual à pasta base do usuário ou '*', começar da pasta base
-                            const baseFolder = user.folder || '*';
-                            const currentPath = currentFolder === '*' ? baseFolder : currentFolder;
-                            
-                            // Verificar se já estamos na pasta base ou em uma subpasta
-                            if (currentPath === baseFolder || currentPath.startsWith(baseFolder + '/')) {
-                              // Estamos dentro da pasta do usuário, adicionar a nova pasta ao caminho atual
-                              const newPath = currentPath === baseFolder ? `${baseFolder}/${file.name}` : `${currentPath}/${file.name}`;
-                              // Verificar se não está duplicando
-                              if (!newPath.endsWith(`/${file.name}/${file.name}`)) {
-                                setCurrentFolder(newPath);
+                          // file.folder contém o caminho onde a pasta está localizada
+                          // file.name é o nome da pasta
+                          // O caminho completo será: file.folder + '/' + file.name (se file.folder não for '*')
+                          
+                          let newPath: string;
+                          
+                          if (file.folder && file.folder !== '*') {
+                            // Se file.folder existe e não é '*', construir caminho completo
+                            newPath = `${file.folder}/${file.name}`;
+                          } else {
+                            // Se file.folder é '*' ou não existe, a pasta está na raiz
+                            newPath = file.name;
+                          }
+                          
+                          // Para usuários "user", verificar se a pasta está dentro da pasta base
+                          if (user?.role === 'user') {
+                            const userFolder = user.folder || '';
+                            if (userFolder) {
+                              // Verificar se newPath está dentro da pasta do usuário
+                              if (newPath !== userFolder && !newPath.startsWith(userFolder + '/')) {
+                                setError('Você não tem permissão para acessar esta pasta');
+                                return;
                               }
-                            } else {
-                              // Se não, começar da pasta base
-                              const newPath = baseFolder === '*' ? file.name : `${baseFolder}/${file.name}`;
-                              setCurrentFolder(newPath);
                             }
+                          }
+                          
+                          // Verificar se não está tentando navegar para o mesmo lugar
+                          if (newPath !== currentFolder) {
+                            setCurrentFolder(newPath);
                           }
                         }}
                         className="group bg-black border-2 border-black rounded-lg overflow-hidden hover:bg-gray-900 hover:border-gray-700 transition-all duration-300 hover:shadow-2xl cursor-pointer transform hover:-translate-y-1"
@@ -1000,7 +1348,7 @@ export default function DatabasePage() {
                           <Folder size={40} className="text-white group-hover:scale-110 transition-transform duration-300" strokeWidth={2} />
                         </div>
                         <div className="p-2.5 bg-black">
-                          <h3 className="font-semibold text-white text-xs truncate text-center">{file.name}</h3>
+                          <h3 className="font-semibold text-white text-xs truncate text-center uppercase">{file.name}</h3>
                         </div>
                       </div>
                     );
@@ -1023,6 +1371,11 @@ export default function DatabasePage() {
                         // Se for imagem, abrir modal de visualização
                         const isImage = (file as any).mimeType?.startsWith('image/');
                         if (isImage && file.url) {
+                          // Limpar blob URL anterior se existir
+                          if (previewImageBlobUrl) {
+                            window.URL.revokeObjectURL(previewImageBlobUrl);
+                            setPreviewImageBlobUrl(null);
+                          }
                           setPreviewImageError(false);
                           setPreviewImageLoading(true);
                           setPreviewFile(file);
@@ -1096,6 +1449,11 @@ export default function DatabasePage() {
                                   e.stopPropagation();
                                   const isImage = (file as any).mimeType?.startsWith('image/');
                                   if (isImage) {
+                                    // Limpar blob URL anterior se existir
+                                    if (previewImageBlobUrl) {
+                                      window.URL.revokeObjectURL(previewImageBlobUrl);
+                                      setPreviewImageBlobUrl(null);
+                                    }
                                     setPreviewImageError(false);
                                     setPreviewImageLoading(true);
                                     setPreviewFile(file);
@@ -1141,10 +1499,39 @@ export default function DatabasePage() {
                                 <Download size={18} className="text-black md:w-4 md:h-4" />
                               </button>
                             )}
+                            {user?.permissions?.upload && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowRenameModal({ file, type: file.type === 'folder' ? 'folder' : 'file' });
+                                    setRenameValue(file.name);
+                                  }}
+                                  className="p-2.5 md:p-2 bg-blue-500/90 backdrop-blur-sm rounded-lg hover:bg-blue-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                  title="Renomear"
+                                >
+                                  <Edit2 size={18} className="text-white md:w-4 md:h-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowMoveModal({ file });
+                                  }}
+                                  className="p-2.5 md:p-2 bg-yellow-500/90 backdrop-blur-sm rounded-lg hover:bg-yellow-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                  title="Mover"
+                                >
+                                  <Move size={18} className="text-white md:w-4 md:h-4" />
+                                </button>
+                              </>
+                            )}
                             {canDelete && (
                               <button 
-                                onClick={() => handleDeleteFile(file.id, file.folder)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file.id, file.folder, file.name);
+                                }}
                                 className="p-2.5 md:p-2 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                title="Deletar"
                               >
                                 <Trash2 size={18} className="text-white md:w-4 md:h-4" />
                               </button>
@@ -1157,6 +1544,11 @@ export default function DatabasePage() {
                             {file.url && (
                               <button
                                 onClick={() => {
+                                  // Limpar blob URL anterior se existir
+                                  if (previewImageBlobUrl) {
+                                    window.URL.revokeObjectURL(previewImageBlobUrl);
+                                    setPreviewImageBlobUrl(null);
+                                  }
                                   setPreviewImageError(false);
                                   setPreviewImageLoading(true);
                                   setPreviewFile(file);
@@ -1206,7 +1598,143 @@ export default function DatabasePage() {
                     </div>
                   );
                 })}
-            </div>
+              </div>
+            ) : (
+              // Visualização em Lista
+              <div className="space-y-2">
+                {files
+                  .filter(file => {
+                    // Filtro por tipo
+                    if (fileTypeFilter !== 'all') {
+                      if (fileTypeFilter === 'folder' && file.type === 'folder') return true;
+                      if (fileTypeFilter === 'image' && (file as any).mimeType?.startsWith('image/')) return true;
+                      if (fileTypeFilter === 'video' && (file as any).mimeType?.startsWith('video/')) return true;
+                      if (fileTypeFilter === 'document') {
+                        const mime = (file as any).mimeType || '';
+                        return mime.includes('pdf') || mime.includes('document') || mime.includes('spreadsheet');
+                      }
+                      if (fileTypeFilter !== 'folder' && file.type === 'folder') return false;
+                    }
+                    return true;
+                  })
+                  .filter(file =>
+                    file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (file.tags && file.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase())))
+                  )
+                  .map(file => {
+                    const isSelected = selectedFiles.has(file.id);
+                    const isFolder = (file as any).type === 'folder' || (file as any).mimeType === 'application/vnd.google-apps.folder';
+                    const canDelete = user?.permissions?.delete ?? false;
+                    
+                    return (
+                      <div
+                        key={file.id}
+                        className={`flex items-center gap-4 p-3 bg-white border-2 rounded-lg hover:shadow-md transition-all ${
+                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedFiles);
+                            if (e.target.checked) {
+                              newSelected.add(file.id);
+                            } else {
+                              newSelected.delete(file.id);
+                            }
+                            setSelectedFiles(newSelected);
+                          }}
+                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {isFolder ? (
+                          <Folder size={24} className="text-gray-600" />
+                        ) : (file as any).mimeType?.startsWith('image/') ? (
+                          <ImageIcon size={24} className="text-gray-600" />
+                        ) : (
+                          <FileText size={24} className="text-gray-600" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-black truncate uppercase">{file.name}</h3>
+                          <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+                            {(file as any).size && (
+                              <span>{(parseInt((file as any).size) / 1024 / 1024).toFixed(2)} MB</span>
+                            )}
+                            {(file as any).mimeType && (
+                              <span>{(file as any).mimeType}</span>
+                            )}
+                            {(file as any).modifiedTime && (
+                              <span>{new Date((file as any).modifiedTime).toLocaleDateString('pt-BR')}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {file.url && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const isImage = (file as any).mimeType?.startsWith('image/');
+                                if (isImage) {
+                                  if (previewImageBlobUrl) {
+                                    window.URL.revokeObjectURL(previewImageBlobUrl);
+                                    setPreviewImageBlobUrl(null);
+                                  }
+                                  setPreviewImageError(false);
+                                  setPreviewImageLoading(true);
+                                  setPreviewFile(file);
+                                } else {
+                                  window.open(file.url, '_blank', 'noopener,noreferrer');
+                                }
+                              }}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Visualizar"
+                            >
+                              <Eye size={18} className="text-gray-600" />
+                            </button>
+                          )}
+                          {user?.permissions?.upload && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowRenameModal({ file, type: isFolder ? 'folder' : 'file' });
+                                  setRenameValue(file.name);
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Renomear"
+                              >
+                                <Edit2 size={18} className="text-gray-600" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowMoveModal({ file });
+                                }}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Mover"
+                              >
+                                <Move size={18} className="text-gray-600" />
+                              </button>
+                            </>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFile(file.id, file.folder, file.name);
+                              }}
+                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Deletar"
+                            >
+                              <Trash2 size={18} className="text-red-600" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
 
             {files.length === 0 && !loading && (
               <div className="text-center py-12">
@@ -1273,15 +1801,17 @@ export default function DatabasePage() {
               <input
                 type="text"
                 value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Ex: Eventos 2024"
+                onChange={(e) => {
+                  // Converter para maiúsculas automaticamente enquanto digita
+                  const upperValue = e.target.value.toUpperCase();
+                  setNewFolderName(upperValue);
+                }}
+                placeholder="Ex: EVENTOS 2024 (apenas MAIÚSCULAS)"
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                style={{ textTransform: 'uppercase' }}
                 autoFocus
               />
-              <p className="text-xs text-gray-500 mt-1">
-                A pasta será criada dentro de: <strong>{getCurrentFolderPath()}</strong>
-              </p>
             </div>
             
             <div className="flex gap-2 justify-end">
@@ -1372,17 +1902,17 @@ export default function DatabasePage() {
                           </p>
                         </div>
                         <div className="ml-3 flex items-center gap-2">
-                          {loading && progress !== undefined && (
+                          {progress !== undefined && (
                             <>
                               {isError ? (
-                                <span className="text-red-500 text-xs">Erro</span>
+                                <span className="text-red-500 text-xs font-medium">Erro</span>
                               ) : isComplete ? (
                                 <CheckCircle className="text-green-500" size={20} />
                               ) : (
-                                <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-black transition-all duration-300"
-                                    style={{ width: `${progress}%` }}
+                                    className="h-full bg-blue-600 transition-all duration-300"
+                                    style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
                                   />
                                 </div>
                               )}
@@ -1445,6 +1975,11 @@ export default function DatabasePage() {
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => {
+            // Limpar blob URL ao fechar
+            if (previewImageBlobUrl) {
+              window.URL.revokeObjectURL(previewImageBlobUrl);
+              setPreviewImageBlobUrl(null);
+            }
             setPreviewFile(null);
             setPreviewImageError(false);
             setPreviewImageLoading(true);
@@ -1457,6 +1992,11 @@ export default function DatabasePage() {
             {/* Botão Fechar */}
             <button
               onClick={() => {
+                // Limpar blob URL ao fechar
+                if (previewImageBlobUrl) {
+                  window.URL.revokeObjectURL(previewImageBlobUrl);
+                  setPreviewImageBlobUrl(null);
+                }
                 setPreviewFile(null);
                 setPreviewImageError(false);
                 setPreviewImageLoading(true);
@@ -1506,13 +2046,32 @@ export default function DatabasePage() {
                       <p className="text-lg mb-2">Erro ao carregar imagem</p>
                       <p className="text-sm opacity-75 mb-4">{previewFile.name}</p>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setPreviewImageError(false);
                           setPreviewImageLoading(true);
-                          // Forçar recarregamento da imagem
-                          const img = document.querySelector('.preview-image') as HTMLImageElement;
-                          if (img) {
-                            img.src = `/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`;
+                          // Recarregar imagem usando fetch
+                          try {
+                            const response = await fetch(`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`, {
+                              credentials: 'include'
+                            });
+                            if (response.ok) {
+                              const blob = await response.blob();
+                              const blobUrl = window.URL.createObjectURL(blob);
+                              // Limpar blob URL anterior se existir
+                              if (previewImageBlobUrl) {
+                                window.URL.revokeObjectURL(previewImageBlobUrl);
+                              }
+                              setPreviewImageBlobUrl(blobUrl);
+                              setPreviewImageError(false);
+                              setPreviewImageLoading(false);
+                            } else {
+                              setPreviewImageError(true);
+                              setPreviewImageLoading(false);
+                            }
+                          } catch (error) {
+                            console.error('Erro ao recarregar imagem:', error);
+                            setPreviewImageError(true);
+                            setPreviewImageLoading(false);
                           }
                         }}
                         className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100 transition-colors text-sm"
@@ -1520,68 +2079,28 @@ export default function DatabasePage() {
                         Tentar Novamente
                       </button>
                     </div>
-                  ) : (
+                  ) : previewImageBlobUrl ? (
                     <img 
-                      key={`${previewFile.id}-${Date.now()}`}
-                      src={`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`}
+                      key={previewFile.id}
+                      src={previewImageBlobUrl}
                       alt={previewFile.name}
                       className="preview-image max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                      onError={async (e) => {
-                        console.error('Erro ao carregar imagem no modal', {
-                          fileId: previewFile.id,
-                          url: (e.target as HTMLImageElement).src
-                        });
-                        const target = e.target as HTMLImageElement;
-                        
-                        // Tentar verificar se o problema é de autenticação ou formato
-                        try {
-                          const response = await fetch(`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`, {
-                            credentials: 'include'
-                          });
-                          const contentType = response.headers.get('content-type');
-                          
-                          if (!response.ok) {
-                            // Se não for OK, tentar ler como JSON para ver o erro
-                            const errorText = await response.text();
-                            let errorData = null;
-                            try {
-                              errorData = JSON.parse(errorText);
-                            } catch {
-                              // Não é JSON, usar o texto direto
-                            }
-                            console.error('Erro do servidor:', response.status, errorData || errorText);
-                            setPreviewImageLoading(false);
-                            setPreviewImageError(true);
-                          } else if (contentType && contentType.startsWith('image/')) {
-                            // Se a resposta é uma imagem, usar blob URL
-                            const blob = await response.blob();
-                            const blobUrl = window.URL.createObjectURL(blob);
-                            target.src = blobUrl;
-                            setPreviewImageError(false);
-                            setPreviewImageLoading(false);
-                          } else {
-                            // Content-Type não é imagem
-                            console.error('Resposta não é uma imagem:', contentType);
-                            setPreviewImageLoading(false);
-                            setPreviewImageError(true);
-                          }
-                        } catch (fetchError) {
-                          console.error('Erro ao verificar URL:', fetchError);
-                          setPreviewImageLoading(false);
-                          setPreviewImageError(true);
-                        }
+                      onError={() => {
+                        console.error('Erro ao exibir imagem do blob URL');
+                        setPreviewImageError(true);
+                        setPreviewImageLoading(false);
                       }}
                       onLoad={() => {
                         console.log('Imagem carregada com sucesso no modal');
                         setPreviewImageLoading(false);
                         setPreviewImageError(false);
                       }}
-                      onLoadStart={() => {
-                        console.log('Iniciando carregamento da imagem');
-                        setPreviewImageLoading(true);
-                      }}
                       style={{ display: previewImageLoading ? 'none' : 'block' }}
                     />
+                  ) : (
+                    <div className="text-white text-center p-8">
+                      <p className="text-lg mb-2">Carregando imagem...</p>
+                    </div>
                   )}
                 </>
               ) : (
@@ -1592,51 +2111,286 @@ export default function DatabasePage() {
               )}
             </div>
             
-            {/* Informações na parte inferior */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-6 py-3 rounded-lg">
-              <p className="text-sm font-medium text-center">{previewFile.name}</p>
-              {getImageFiles().length > 1 && (
-                <p className="text-xs text-center mt-1 opacity-75">
-                  {getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}
-                </p>
-              )}
-              <div className="flex gap-3 mt-2 justify-center">
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    // Fazer download via fetch para não abrir nova aba
-                    try {
-                      const response = await fetch(`/api/download-file.php?id=${previewFile.id}`, {
-                        credentials: 'include'
-                      });
-                      if (response.ok) {
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = previewFile.name;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                      } else {
-                        console.error('Erro ao fazer download');
-                      }
-                    } catch (error) {
-                      console.error('Erro ao fazer download:', error);
-                    }
-                  }}
-                  className="px-4 py-1.5 border border-white text-white rounded hover:bg-white/10 transition-colors text-sm"
-                >
-                  Download
-                </button>
+            {/* Informações melhoradas na parte inferior */}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm text-white p-4">
+              <div className="max-w-7xl mx-auto">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-lg mb-1 truncate">{previewFile.name}</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-300">
+                      {(previewFile as any).size && (
+                        <span>{(parseInt((previewFile as any).size) / 1024 / 1024).toFixed(2)} MB</span>
+                      )}
+                      {(previewFile as any).mimeType && (
+                        <span>{(previewFile as any).mimeType}</span>
+                      )}
+                      {(previewFile as any).modifiedTime && (
+                        <span>{new Date((previewFile as any).modifiedTime).toLocaleDateString('pt-BR')}</span>
+                      )}
+                      {getImageFiles().length > 1 && (
+                        <span>{getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        try {
+                          const response = await fetch(`/api/download-file.php?id=${previewFile.id}`, {
+                            credentials: 'include'
+                          });
+                          if (response.ok) {
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = previewFile.name;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                            addToast('Download iniciado', 'success');
+                          } else {
+                            addToast('Erro ao fazer download', 'error');
+                          }
+                        } catch (error) {
+                          addToast('Erro ao fazer download', 'error');
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Download size={18} />
+                      <span>Download</span>
+                    </button>
+                    {user?.permissions?.upload && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowRenameModal({ file: previewFile, type: previewFile.type === 'folder' ? 'folder' : 'file' });
+                          setRenameValue(previewFile.name);
+                          setPreviewFile(null);
+                        }}
+                        className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Edit2 size={18} />
+                        <span>Renomear</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
+            
+            {/* Contador de Imagens */}
+            {getImageFiles().length > 1 && previewFile.mimeType?.startsWith('image/') && (
+              <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-black/70 text-white rounded-full backdrop-blur-sm text-sm">
+                {getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}
+              </div>
+            )}
           </div>
         </div>
       )}
-      </div>
+
+      {/* Modal de Renomear */}
+      {showRenameModal && (
+        <Modal
+          isOpen={!!showRenameModal}
+          onClose={() => {
+            setShowRenameModal(null);
+            setRenameValue('');
+          }}
+          title={`Renomear ${showRenameModal.type === 'folder' ? 'Pasta' : 'Arquivo'}`}
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!showRenameModal || !renameValue.trim()) return;
+              
+              setLoading(true);
+              try {
+                const newName = renameValue.trim().toUpperCase();
+                const response = await api.renameFile(
+                  showRenameModal.file.id,
+                  newName,
+                  showRenameModal.file.folder,
+                  showRenameModal.type
+                );
+                
+                if (response.error) {
+                  addToast(response.error, 'error');
+                } else {
+                  addToast(`${showRenameModal.type === 'folder' ? 'Pasta' : 'Arquivo'} renomeado com sucesso`, 'success');
+                  setShowRenameModal(null);
+                  setRenameValue('');
+                  await loadFiles();
+                }
+              } catch (err: any) {
+                addToast(err.message || 'Erro ao renomear', 'error');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Novo Nome
+              </label>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => {
+                  const upperValue = e.target.value.toUpperCase();
+                  setRenameValue(upperValue);
+                }}
+                placeholder={showRenameModal.file.name}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                style={{ textTransform: 'uppercase' }}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRenameModal(null);
+                  setRenameValue('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !renameValue.trim()}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50"
+              >
+                {loading ? 'Renomeando...' : 'Renomear'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal de Mover */}
+      {showMoveModal && (
+        <Modal
+          isOpen={!!showMoveModal}
+          onClose={() => setShowMoveModal(null)}
+          title="Mover Arquivo"
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!showMoveModal) return;
+              
+              const formData = new FormData(e.currentTarget);
+              const toFolder = formData.get('toFolder') as string;
+              
+              if (!toFolder) {
+                addToast('Selecione uma pasta de destino', 'warning');
+                return;
+              }
+              
+              setLoading(true);
+              try {
+                const response = await api.moveFile(
+                  showMoveModal.file.id,
+                  showMoveModal.file.folder,
+                  toFolder,
+                  showMoveModal.file.type === 'folder' ? 'folder' : 'file'
+                );
+                
+                if (response.error) {
+                  addToast(response.error, 'error');
+                } else {
+                  addToast('Arquivo movido com sucesso', 'success');
+                  setShowMoveModal(null);
+                  await loadFiles();
+                }
+              } catch (err: any) {
+                addToast(err.message || 'Erro ao mover arquivo', 'error');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Mover para:
+              </label>
+              <select
+                name="toFolder"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                defaultValue={currentFolder}
+              >
+                {folders.map((folder) => (
+                  <option key={folder} value={folder}>
+                    {folder === '*' ? 'Todas' : folder.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowMoveModal(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50"
+              >
+                {loading ? 'Movendo...' : 'Mover'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {/* Modal de Confirmação de Delete */}
+      {showDeleteConfirm && (
+        <Modal
+          isOpen={!!showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(null)}
+          title="Confirmar Exclusão"
+        >
+          <div className="space-y-4">
+            <p className="text-gray-700">
+              Tem certeza que deseja deletar <strong>{showDeleteConfirm.fileName}</strong>?
+            </p>
+            <p className="text-sm text-gray-500">
+              Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+              >
+                {loading ? 'Deletando...' : 'Deletar'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
     </>
   );
 }
@@ -1651,7 +2405,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
     email: '',
     password: '',
     name: '',
-    role: 'user' as 'root' | 'admin' | 'user',
+    role: 'user' as 'root' | 'admin' | 'viewer' | 'user',
     folder: ''
   });
 
@@ -1770,10 +2524,11 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nível</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'root' | 'admin' | 'user' })}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'root' | 'admin' | 'viewer' | 'user' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
               >
                 <option value="user">USER</option>
+                <option value="viewer">VIEWER</option>
                 <option value="admin">ADMIN</option>
                 <option value="root">ROOT</option>
               </select>
@@ -1785,10 +2540,23 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
                   type="text"
                   value={formData.folder}
                   onChange={(e) => setFormData({ ...formData, folder: e.target.value })}
-                  placeholder="Ex: fotografos ou midias/nome-da-midia"
+                  onBlur={(e) => {
+                    // Se o campo estiver vazio, gerar automaticamente a partir do email
+                    if (!e.target.value && formData.email) {
+                      const emailPrefix = formData.email.split('@')[0];
+                      // Remover caracteres especiais e converter para minúsculas
+                      const folderName = emailPrefix.toLowerCase().replace(/[^a-z0-9]/g, '');
+                      if (folderName) {
+                        setFormData({ ...formData, folder: folderName });
+                      }
+                    }
+                  }}
+                  placeholder="Ex: mangalargamarchador (gerado automaticamente do email se vazio)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">Pasta que o usuário terá acesso</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Pasta que o usuário terá acesso. Se deixar vazio, será gerada automaticamente a partir do email.
+                </p>
               </div>
             )}
             <div className="flex gap-2">

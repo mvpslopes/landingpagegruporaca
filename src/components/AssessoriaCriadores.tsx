@@ -168,9 +168,9 @@ export default function AssessoriaCriadores() {
           
           {/* Contatos */}
           <div className="space-y-6 mb-8">
-            {/* Ligação */}
+            {/* Central de Atendimento */}
             <div>
-              <p className="text-base sm:text-lg font-semibold text-black mb-2">Ligação:</p>
+              <p className="text-base sm:text-lg font-semibold text-black mb-2">Central de Atendimento:</p>
               <a
                 href="tel:2133289772"
                 className="group bg-black text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 inline-flex text-sm sm:text-base"
@@ -178,40 +178,6 @@ export default function AssessoriaCriadores() {
                 <Phone size={18} className="sm:w-5 sm:h-5" />
                 (21) 3328-9772
               </a>
-            </div>
-
-            {/* WhatsApp */}
-            <div>
-              <p className="text-base sm:text-lg font-semibold text-black mb-3 sm:mb-4">WhatsApp:</p>
-              <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-4">
-                {/* Ariane Andrade */}
-                <a
-                  href="https://wa.me/5521981972847?text=Olá, gostaria de saber mais sobre os serviços de Assessoria ao Criador."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group bg-green-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <MessageCircle size={18} className="sm:w-5 sm:h-5" />
-                  <div className="text-left">
-                    <div className="text-xs sm:text-sm font-normal">Ariane Andrade:</div>
-                    <div className="text-sm sm:text-base">(21) 98197-2847</div>
-                  </div>
-                </a>
-                
-                {/* Carol Marinho */}
-                <a
-                  href="https://wa.me/5531990790604?text=Olá, gostaria de saber mais sobre os serviços de Assessoria ao Criador."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group bg-green-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
-                >
-                  <MessageCircle size={18} className="sm:w-5 sm:h-5" />
-                  <div className="text-left">
-                    <div className="text-xs sm:text-sm font-normal">Carol Marinho:</div>
-                    <div className="text-sm sm:text-base">(31) 99079-0604</div>
-                  </div>
-                </a>
-              </div>
             </div>
           </div>
         </div>

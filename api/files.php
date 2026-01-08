@@ -4,6 +4,37 @@
  * Integrado com Google Drive (Shared Drive)
  */
 
+// Desabilitar exibição de erros e warnings
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Iniciar output buffering ANTES de qualquer coisa
+if (ob_get_level() == 0) {
+    ob_start();
+} else {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    ob_start();
+}
+
+// Capturar erros fatais
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
+        ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode([
+            'error' => 'Erro fatal: ' . $error['message'],
+            'file' => $error['file'],
+            'line' => $error['line']
+        ]);
+        exit;
+    }
+});
+
 require_once 'config.php';
 require_once 'permissions_db.php';
 
@@ -37,6 +68,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $folder = $_GET['folder'] ?? '*';
         
+        // Para usuários USER, garantir que sempre usem sua pasta base se não especificada
+        if ($user['role'] === 'user') {
+            $userFolder = $user['folder'] ?? '';
+            if (empty($folder) || $folder === '*') {
+                // Se não especificou pasta, usar a pasta base do usuário
+                if (!empty($userFolder) && $userFolder !== '*') {
+                    $folder = $userFolder;
+                }
+            }
+        }
+        
         // Verificar acesso à pasta
         if (!canAccessFolder($user, $folder)) {
             jsonError('Sem acesso a esta pasta', 403);
@@ -48,6 +90,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $driveFolder = convertUserFolderToDrivePath($user, $folder);
             $files = $driveService->listFiles($driveFolder, true);
             
+            // Para usuários USER, garantir que só vejam arquivos de sua pasta
+            if ($user['role'] === 'user') {
+                $userFolder = $user['folder'] ?? '';
+                if (!empty($userFolder) && $userFolder !== '*') {
+                    $filteredFiles = [];
+                    foreach ($files as $file) {
+                        // O arquivo está na pasta que foi solicitada (driveFolder)
+                        // Se driveFolder começa com userFolder, então está correto
+                        if (strpos($driveFolder, $userFolder) === 0 || $driveFolder === $userFolder) {
+                            $filteredFiles[] = $file;
+                        }
+                    }
+                    $files = $filteredFiles;
+                }
+            }
+            
+            // Limpar qualquer output antes de enviar JSON
+            ob_clean();
+            
             jsonResponse([
                 'files' => $files,
                 'folder' => $folder,
@@ -57,6 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         } catch (Exception $e) {
             error_log('Erro ao listar arquivos do Google Drive: ' . $e->getMessage());
             error_log('Stack trace: ' . $e->getTraceAsString());
+            
+            // Limpar qualquer output antes de enviar JSON
+            ob_clean();
+            
+            // Limpar qualquer output antes de enviar JSON
+            ob_clean();
+            
             jsonResponse([
                 'files' => [],
                 'folder' => $folder,
@@ -68,6 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } catch (Exception $e) {
         error_log('Erro geral em files.php: ' . $e->getMessage());
         error_log('Stack trace: ' . $e->getTraceAsString());
+        
+        // Limpar qualquer output antes de enviar JSON
+        ob_clean();
+        
         jsonError('Erro ao processar requisição: ' . $e->getMessage(), 500);
     }
 }
@@ -154,12 +226,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
 }
 
+// PATCH: Renomear arquivo ou pasta
+if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $fileId = $data['id'] ?? null;
+        $newName = trim($data['name'] ?? '');
+        $folder = $data['folder'] ?? '*';
+        $type = $data['type'] ?? 'file';
+        
+        if (!$fileId || empty($newName)) {
+            jsonError('ID e novo nome são obrigatórios', 400);
+        }
+        
+        // Validar nome (deve estar em maiúsculas)
+        if (preg_match('/[a-z]/', $newName)) {
+            jsonError('O nome deve estar em MAIÚSCULAS', 400);
+        }
+        
+        // Verificar permissão de upload (necessária para renomear)
+        if (!hasPermission($user, 'upload', $folder)) {
+            jsonError('Sem permissão para renomear', 403);
+        }
+        
+        // Verificar acesso à pasta
+        if (!canAccessFolder($user, $folder)) {
+            jsonError('Sem acesso a esta pasta', 403);
+        }
+        
+        // Renomear no Google Drive
+        $driveService->renameFile($fileId, strtoupper($newName));
+        
+        jsonResponse([
+            'success' => true,
+            'message' => ($type === 'folder' ? 'Pasta' : 'Arquivo') . ' renomeado com sucesso',
+            'storage' => 'google_drive'
+        ]);
+    } catch (Exception $e) {
+        error_log('Erro ao renomear: ' . $e->getMessage());
+        jsonError('Erro ao renomear: ' . $e->getMessage(), 500);
+    }
+}
+
+// PUT: Mover arquivo ou pasta
+if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $fileId = $data['id'] ?? null;
+        $fromFolder = $data['fromFolder'] ?? '*';
+        $toFolder = $data['toFolder'] ?? '*';
+        $type = $data['type'] ?? 'file';
+        
+        if (!$fileId) {
+            jsonError('ID do arquivo é obrigatório', 400);
+        }
+        
+        // Verificar permissão de upload (necessária para mover)
+        if (!hasPermission($user, 'upload', $fromFolder) || !hasPermission($user, 'upload', $toFolder)) {
+            jsonError('Sem permissão para mover', 403);
+        }
+        
+        // Verificar acesso às pastas
+        if (!canAccessFolder($user, $fromFolder) || !canAccessFolder($user, $toFolder)) {
+            jsonError('Sem acesso a uma das pastas', 403);
+        }
+        
+        // Converter pastas para caminhos do Google Drive
+        $driveFromFolder = convertUserFolderToDrivePath($user, $fromFolder);
+        $driveToFolder = convertUserFolderToDrivePath($user, $toFolder);
+        
+        // Obter IDs das pastas
+        $fromFolderId = $driveFromFolder === '*' 
+            ? $driveService->getRootFolderId()
+            : $driveService->ensureFolder($driveFromFolder);
+        
+        $toFolderId = $driveToFolder === '*'
+            ? $driveService->getRootFolderId()
+            : $driveService->ensureFolder($driveToFolder);
+        
+        // Mover no Google Drive
+        $driveService->moveFile($fileId, $toFolderId, $fromFolderId);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => ($type === 'folder' ? 'Pasta' : 'Arquivo') . ' movido com sucesso',
+            'storage' => 'google_drive'
+        ]);
+    } catch (Exception $e) {
+        error_log('Erro ao mover: ' . $e->getMessage());
+        jsonError('Erro ao mover: ' . $e->getMessage(), 500);
+    }
+}
+
 /**
  * Converter pasta do usuário para caminho do Google Drive
  */
 function convertUserFolderToDrivePath($user, $folder) {
-    // Se for ROOT ou ADMIN, pode acessar qualquer pasta
-    if ($user['role'] === 'root' || $user['role'] === 'admin') {
+    // Se for ROOT, ADMIN ou VIEWER, pode acessar qualquer pasta
+    if ($user['role'] === 'root' || $user['role'] === 'admin' || $user['role'] === 'viewer') {
         if ($folder === '*') {
             return '*'; // Pasta raiz (GRUPO_RACA)
         }

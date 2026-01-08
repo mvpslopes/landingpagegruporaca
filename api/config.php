@@ -35,6 +35,11 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Função para resposta JSON
 function jsonResponse($data, $statusCode = 200) {
+    // Limpar qualquer output antes de enviar JSON
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
     http_response_code($statusCode);
     echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     exit;

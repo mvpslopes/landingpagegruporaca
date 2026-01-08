@@ -99,17 +99,6 @@ export default function Footer() {
                     <Phone size={16} />
                     {contact.phone}
                   </a>
-                  {contact.whatsapp && (
-                    <a
-                      href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(contact.whatsappMessage || 'Olá!')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-200 text-sm"
-                    >
-                      <Phone size={16} />
-                      WhatsApp
-                    </a>
-                  )}
                   {contact.email && (
                     <a
                       href={`mailto:${contact.email}`}

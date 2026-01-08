@@ -48,6 +48,12 @@ class DriveService {
         }
         
         $this->config = require $configPath;
+        
+        // Validar root_folder_id
+        if (empty($this->config['root_folder_id'])) {
+            throw new Exception('root_folder_id não está configurado no arquivo de configuração do Drive');
+        }
+        
         $this->rootFolderId = $this->config['root_folder_id'];
         
         // Inicializar cliente Google (tentar com alias primeiro, depois namespace)
@@ -113,15 +119,43 @@ class DriveService {
     }
     
     /**
+     * Obter ID da pasta raiz
+     */
+    public function getRootFolderId() {
+        return $this->rootFolderId;
+    }
+    
+    /**
+     * Obter serviço do Google Drive (para uso em scripts de diagnóstico)
+     */
+    public function getService() {
+        return $this->service;
+    }
+    
+    /**
      * Obter ID de uma pasta pelo nome (dentro da pasta raiz)
+     * Busca case-insensitive e normaliza para maiúsculas
      */
     public function getFolderIdByName($folderName, $parentId = null) {
         $parentId = $parentId ?? $this->rootFolderId;
         
+        // Não permitir buscar pasta com nome "*" pois é reservado para a raiz
+        if ($folderName === '*') {
+            return $this->rootFolderId;
+        }
+        
+        // Normalizar nome para maiúsculas
+        $folderName = strtoupper(trim($folderName));
+        if (empty($folderName)) {
+            return null;
+        }
+        
         try {
-            $query = "name = '" . addslashes($folderName) . "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+            // Buscar todas as pastas no parentId e comparar case-insensitive
+            $escapedParentId = addslashes($parentId);
+            $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
             if ($parentId) {
-                $query .= " and '" . addslashes($parentId) . "' in parents";
+                $query .= " and '{$escapedParentId}' in parents";
             }
             
             $results = $this->service->files->listFiles([
@@ -131,10 +165,18 @@ class DriveService {
                 'includeItemsFromAllDrives' => true
             ]);
             
-            if (count($results->getFiles()) > 0) {
-                return $results->getFiles()[0]->getId();
+            // Comparar case-insensitive
+            $files = $results->getFiles();
+            foreach ($files as $file) {
+                $fileName = strtoupper(trim($file->getName()));
+                if ($fileName === $folderName) {
+                    $foundId = $file->getId();
+                    error_log("Pasta encontrada: '{$folderName}' (ID: {$foundId}) dentro de '{$parentId}'");
+                    return $foundId;
+                }
             }
             
+            error_log("Pasta não encontrada: '{$folderName}' dentro de '{$parentId}'");
             return null;
         } catch (Exception $e) {
             error_log('Erro ao buscar pasta: ' . $e->getMessage());
@@ -147,17 +189,28 @@ class DriveService {
      */
     public function ensureFolder($folderPath, $parentId = null) {
         $parentId = $parentId ?? $this->rootFolderId;
+        
+        // Não permitir criar pasta com caminho "*"
+        if ($folderPath === '*') {
+            return $this->rootFolderId;
+        }
+        
         $parts = explode('/', trim($folderPath, '/'));
         $currentParent = $parentId;
         
         foreach ($parts as $part) {
-            if (empty($part)) continue;
+            if (empty($part) || $part === '*') continue;
+            
+            // Garantir que cada parte do caminho está em maiúsculas
+            $part = strtoupper(trim($part));
+            if (empty($part) || $part === '*') continue;
             
             $folderId = $this->getFolderIdByName($part, $currentParent);
             
             if (!$folderId) {
                 // Criar pasta
                 $folderId = $this->createFolder($part, $currentParent);
+                error_log("Pasta criada: '{$part}' dentro de '{$currentParent}' (ID: {$folderId})");
             }
             
             $currentParent = $folderId;
@@ -171,6 +224,14 @@ class DriveService {
      */
     public function createFolder($name, $parentId = null) {
         $parentId = $parentId ?? $this->rootFolderId;
+        
+        // Garantir que o nome da pasta está em maiúsculas
+        $name = strtoupper(trim($name));
+        
+        // Não permitir criar pasta com nome "*" pois é reservado para a raiz
+        if ($name === '*' || empty($name)) {
+            throw new Exception('Nome de pasta inválido. O nome "*" é reservado para a raiz.');
+        }
         
         try {
             // Criar metadata do arquivo (tentar com alias primeiro, depois namespace)
@@ -207,6 +268,11 @@ class DriveService {
      */
     public function listFiles($folderPath = '*', $includeFolders = true) {
         try {
+            // Validar rootFolderId
+            if (empty($this->rootFolderId)) {
+                throw new Exception('Root folder ID não está configurado');
+            }
+            
             $folderId = null;
             
             // Se for '*', listar da pasta raiz
@@ -215,10 +281,16 @@ class DriveService {
             } else {
                 // Se o caminho não contém '/', buscar pasta diretamente na raiz (não criar)
                 if (strpos($folderPath, '/') === false) {
-                    $folderId = $this->getFolderIdByName($folderPath, $this->rootFolderId);
-                    // Se não encontrar, listar da raiz (não criar pasta automaticamente)
-                    if (!$folderId) {
+                    // Não permitir buscar pasta com nome "*" pois é reservado para a raiz
+                    if ($folderPath === '*') {
                         $folderId = $this->rootFolderId;
+                    } else {
+                        $folderId = $this->getFolderIdByName($folderPath, $this->rootFolderId);
+                        // Se não encontrar, listar da raiz (não criar pasta automaticamente)
+                        if (!$folderId) {
+                            error_log("Aviso: Pasta '{$folderPath}' não encontrada na raiz. Listando da raiz.");
+                            $folderId = $this->rootFolderId;
+                        }
                     }
                 } else {
                     // Se contém '/', usar ensureFolder para criar estrutura se necessário
@@ -232,6 +304,11 @@ class DriveService {
                 $query .= " and mimeType != 'application/vnd.google-apps.folder'";
             }
             
+            // Validar que temos um folderId válido
+            if (empty($folderId)) {
+                throw new Exception('Folder ID não pode ser vazio');
+            }
+            
             $results = $this->service->files->listFiles([
                 'q' => $query,
                 'fields' => 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink)',
@@ -240,8 +317,22 @@ class DriveService {
                 'includeItemsFromAllDrives' => true
             ]);
             
+            // Validar resposta
+            if (!$results) {
+                error_log('Aviso: listFiles retornou null ou false');
+                return [];
+            }
+            
             $files = [];
-            foreach ($results->getFiles() as $file) {
+            $fileList = $results->getFiles();
+            
+            // Validar que getFiles retorna um array/iterable
+            if (!is_iterable($fileList)) {
+                error_log('Aviso: getFiles() não retornou um iterable');
+                return [];
+            }
+            
+            foreach ($fileList as $file) {
                 $isFolder = $file->getMimeType() === 'application/vnd.google-apps.folder';
                 $fileId = $file->getId();
                 $mimeType = $file->getMimeType();
@@ -465,6 +556,75 @@ class DriveService {
     }
     
     /**
+     * Renomear arquivo ou pasta
+     */
+    public function renameFile($fileId, $newName) {
+        try {
+            // Buscar arquivo atual
+            $file = $this->service->files->get($fileId, [
+                'fields' => 'id, name, mimeType',
+                'supportsAllDrives' => true
+            ]);
+            
+            // Criar metadata de atualização
+            if (class_exists('Google_Service_Drive_DriveFile')) {
+                $updatedFile = new Google_Service_Drive_DriveFile();
+            } elseif (class_exists('Google\Service\Drive\DriveFile')) {
+                $updatedFile = new \Google\Service\Drive\DriveFile();
+            } else {
+                throw new Exception('Classe Google_Service_Drive_DriveFile não encontrada.');
+            }
+            
+            $updatedFile->setName($newName);
+            
+            // Atualizar arquivo
+            $this->service->files->update($fileId, $updatedFile, [
+                'fields' => 'id, name',
+                'supportsAllDrives' => true
+            ]);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log('Erro ao renomear arquivo: ' . $e->getMessage());
+            throw new Exception('Erro ao renomear arquivo: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Mover arquivo ou pasta para outra pasta
+     */
+    public function moveFile($fileId, $newParentId, $oldParentId = null) {
+        try {
+            // Buscar arquivo atual para obter os pais atuais
+            $file = $this->service->files->get($fileId, [
+                'fields' => 'parents',
+                'supportsAllDrives' => true
+            ]);
+            
+            $previousParents = '';
+            if (method_exists($file, 'getParents')) {
+                $parents = $file->getParents();
+                if ($parents && count($parents) > 0) {
+                    $previousParents = implode(',', $parents);
+                }
+            }
+            
+            // Mover arquivo
+            $this->service->files->update($fileId, new \stdClass(), [
+                'addParents' => $newParentId,
+                'removeParents' => $previousParents,
+                'fields' => 'id, parents',
+                'supportsAllDrives' => true
+            ]);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log('Erro ao mover arquivo: ' . $e->getMessage());
+            throw new Exception('Erro ao mover arquivo: ' . $e->getMessage());
+        }
+    }
+    
+    /**
      * Obter informações de um arquivo
      */
     public function getFileInfo($fileId) {
@@ -522,12 +682,6 @@ class DriveService {
         return $this->config;
     }
     
-    /**
-     * Obter serviço do Google Drive
-     */
-    public function getService() {
-        return $this->service;
-    }
 }
 ?>
 
