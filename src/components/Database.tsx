@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   LogIn, X, Search, Upload, Eye, Download, Trash2, 
-  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, CheckCircle, FileText, Video, Music, Grid3x3, List, Edit2, Move
+  Database, Image as ImageIcon, Lock, LogOut, User as UserIcon, Users, Plus, Settings, Folder, FolderPlus, ChevronRight, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2, CheckCircle, FileText, Video, Music, Grid3x3, List, Edit2, Move, Loader2
 } from 'lucide-react';
 import Loading from './Loading';
 import Modal from './Modal';
@@ -20,6 +20,7 @@ export default function DatabasePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showUsersSummary, setShowUsersSummary] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
@@ -47,6 +48,7 @@ export default function DatabasePage() {
   const [showRenameModal, setShowRenameModal] = useState<{ file: FileItem; type: 'file' | 'folder' } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [showMoveModal, setShowMoveModal] = useState<{ file: FileItem } | null>(null);
+  const [loadingFolder, setLoadingFolder] = useState<string | null>(null);
   
   // Função helper para adicionar toast
   const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration?: number) => {
@@ -487,6 +489,7 @@ export default function DatabasePage() {
       setError(err.message || 'Erro ao carregar arquivos');
     } finally {
       setLoading(false);
+      setLoadingFolder(null); // Limpar estado de carregamento da pasta
     }
   };
 
@@ -843,23 +846,23 @@ export default function DatabasePage() {
     return (
       <>
         {loading && <Loading message="Autenticando..." />}
-        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4 md:p-6">
           <div 
-            className={`bg-white rounded-xl shadow-2xl max-w-md w-full p-8 relative transition-all duration-300 ${
+            className={`bg-white rounded-xl shadow-2xl max-w-md w-full p-6 md:p-8 relative transition-all duration-300 ${
               loginVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
             }`}
           >
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-gray-800 to-black rounded-full flex items-center justify-center mx-auto mb-4">
-                <Database size={32} className="text-white" />
+            <div className="text-center mb-6 md:mb-8">
+              <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-gray-800 to-black rounded-full flex items-center justify-center mx-auto mb-4">
+                <Database size={28} className="md:w-8 md:h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-black mb-2">Banco de Dados de Fotos</h2>
-              <p className="text-gray-600">Acesso para designers e fotógrafos</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-black mb-2">Banco de Dados de Fotos</h2>
+              <p className="text-sm md:text-base text-gray-600">Acesso para designers e fotógrafos</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-4 md:space-y-6">
               {loginError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm md:text-base">
                   {loginError}
                 </div>
               )}
@@ -874,7 +877,8 @@ export default function DatabasePage() {
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                  autoComplete="email"
+                  className="w-full px-4 py-3 md:py-3 text-base md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none touch-manipulation"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -889,7 +893,8 @@ export default function DatabasePage() {
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 md:py-3 text-base md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none touch-manipulation"
                   placeholder="••••••••"
                 />
               </div>
@@ -897,26 +902,26 @@ export default function DatabasePage() {
               <button
                 type="submit"
                 disabled={loading || loginSuccess}
-                className={`w-full text-white py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed ${
+                className={`w-full text-white py-3.5 md:py-3 rounded-lg font-semibold text-base md:text-sm transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed touch-manipulation min-h-[48px] ${
                   loginSuccess 
                     ? 'bg-green-600' 
-                    : 'bg-black hover:bg-gray-800 disabled:opacity-50'
+                    : 'bg-black hover:bg-gray-800 active:bg-gray-900 disabled:opacity-50'
                 }`}
               >
                 {loginSuccess ? (
                   <>
                     <CheckCircle size={20} />
-                    Login realizado com sucesso!
+                    <span>Login realizado com sucesso!</span>
                   </>
                 ) : loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Autenticando...
+                    <span>Autenticando...</span>
                   </>
                 ) : (
                   <>
                     <LogIn size={20} />
-                    Entrar
+                    <span>Entrar</span>
                   </>
                 )}
               </button>
@@ -925,7 +930,7 @@ export default function DatabasePage() {
                 type="button"
                 onClick={() => window.location.href = '/'}
                 disabled={loading || loginSuccess}
-                className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gray-100 text-gray-700 py-3.5 md:py-3 rounded-lg font-semibold text-base md:text-sm hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[48px]"
               >
                 Cancelar
               </button>
@@ -950,22 +955,22 @@ export default function DatabasePage() {
       <div className={`min-h-screen bg-gray-50 transition-opacity duration-300 ${isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                <Database size={24} className="text-white" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+              <div className="w-9 h-9 md:w-10 md:h-10 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
+                <Database size={20} className="md:w-6 md:h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-black">Banco de Dados de Fotos</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base md:text-xl font-bold text-black truncate">Banco de Dados de Fotos</h1>
                 <p className="text-sm text-gray-600">Gerencie e organize os arquivos</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
               {selectedFiles.size > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">
-                    {selectedFiles.size} arquivo(s) selecionado(s)
+                  <span className="text-xs md:text-sm text-gray-600 hidden sm:inline">
+                    {selectedFiles.size} selecionado(s)
                   </span>
                   <button
                     onClick={async () => {
@@ -995,24 +1000,26 @@ export default function DatabasePage() {
                       }
                       setSelectedFiles(new Set());
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium"
+                    className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-green-600 text-white hover:bg-green-700 active:bg-green-800 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
                   >
                     <Download size={16} />
-                    Baixar Selecionados ({selectedFiles.size})
+                    <span className="hidden sm:inline">Baixar ({selectedFiles.size})</span>
+                    <span className="sm:hidden">{selectedFiles.size}</span>
                   </button>
                   <button
                     onClick={() => setSelectedFiles(new Set())}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg transition-colors text-sm font-medium"
+                    className="px-3 md:px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
                   >
-                    Limpar Seleção
+                    <span className="hidden sm:inline">Limpar</span>
+                    <span className="sm:hidden">X</span>
                   </button>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <UserIcon size={16} />
-                <div>
-                  <span className="font-medium">{user?.name}</span>
-                  <span className="ml-2 px-2 py-0.5 bg-gray-200 rounded text-xs">
+              <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-gray-600 hidden sm:flex">
+                <UserIcon size={14} className="md:w-4 md:h-4" />
+                <div className="flex items-center gap-1 md:gap-2">
+                  <span className="font-medium truncate max-w-[100px] md:max-w-none">{user?.name}</span>
+                  <span className="px-1.5 md:px-2 py-0.5 bg-gray-200 rounded text-xs flex-shrink-0">
                     {user?.role === 'root' ? 'ROOT' : user?.role === 'admin' ? 'ADMIN' : user?.role === 'viewer' ? 'VIEWER' : 'USER'}
                   </span>
                 </div>
@@ -1020,16 +1027,17 @@ export default function DatabasePage() {
               {canManageUsers && (
                 <button
                   onClick={() => setShowUserManagement(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium"
+                  className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
                 >
-                  <Users size={16} />
-                  Gerenciar Usuários
+                  <Users size={14} className="md:w-4 md:h-4" />
+                  <span className="hidden md:inline">Gerenciar Usuários</span>
+                  <span className="md:hidden">Usuários</span>
                 </button>
               )}
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition-colors text-xs md:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px]"
               >
                 {isLoggingOut ? (
                   <>
@@ -1085,26 +1093,27 @@ export default function DatabasePage() {
             </div>
             
             {/* Breadcrumb da Pasta Atual */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 flex-wrap">
-              {(() => {
-                // Mostrar botão "Voltar" se não estiver na pasta raiz/base
-                const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin' || user?.role === 'viewer';
-                const isUserAtBase = user?.role === 'user' && currentFolder === user?.folder;
-                const canGoBack = (isRootOrAdmin && currentFolder !== '*') || (!isUserAtBase && user?.role === 'user');
-                
-                return canGoBack ? (
-                  <button
-                    onClick={goBackFolder}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
-                    title="Voltar para pasta anterior"
-                  >
-                    <ArrowLeft size={16} />
-                    Voltar
-                  </button>
-                ) : null;
-              })()}
-              <Folder size={18} className="text-gray-600 flex-shrink-0" />
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 md:gap-3 p-2 md:p-3 bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto scrollbar-hide">
+              <div className="flex items-center gap-2 md:gap-3 min-w-max">
+                {(() => {
+                  // Mostrar botão "Voltar" se não estiver na pasta raiz/base
+                  const isRootOrAdmin = user?.role === 'root' || user?.role === 'admin' || user?.role === 'viewer';
+                  const isUserAtBase = user?.role === 'user' && currentFolder === user?.folder;
+                  const canGoBack = (isRootOrAdmin && currentFolder !== '*') || (!isUserAtBase && user?.role === 'user');
+                  
+                  return canGoBack ? (
+                    <button
+                      onClick={goBackFolder}
+                      className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors text-xs md:text-sm font-medium text-gray-700 touch-manipulation min-h-[36px] flex-shrink-0"
+                      title="Voltar para pasta anterior"
+                    >
+                      <ArrowLeft size={14} className="md:w-4 md:h-4" />
+                      <span className="hidden sm:inline">Voltar</span>
+                    </button>
+                  ) : null;
+                })()}
+                <Folder size={16} className="md:w-[18px] md:h-[18px] text-gray-600 flex-shrink-0" />
+                <div className="flex items-center gap-1.5 md:gap-2 min-w-max">
                 <span className="text-sm font-medium text-gray-700">Pasta atual:</span>
                 {(() => {
                   const folderParts = getFolderParts();
@@ -1117,19 +1126,19 @@ export default function DatabasePage() {
                     return (
                       <div className="flex items-center gap-1 flex-wrap">
                         {folderParts.map((part, index, array) => (
-                          <span key={part.path} className="flex items-center gap-1">
+                          <span key={part.path} className="flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={() => setCurrentFolder(part.path)}
-                              className={`text-sm font-semibold px-2 py-1 rounded transition-colors uppercase ${
+                              className={`text-xs md:text-sm font-semibold px-2 md:px-2.5 py-1 md:py-1.5 rounded transition-colors uppercase touch-manipulation min-h-[32px] ${
                                 index === array.length - 1
                                   ? 'text-black bg-white border border-gray-300 cursor-default'
-                                  : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                                  : 'text-gray-600 hover:text-black hover:bg-gray-100 active:bg-gray-200'
                               }`}
                             >
                               {part.name}
                             </button>
                             {index < array.length - 1 && (
-                              <ChevronRight size={14} className="text-gray-400" />
+                              <ChevronRight size={12} className="md:w-[14px] md:h-[14px] text-gray-400 flex-shrink-0" />
                             )}
                           </span>
                         ))}
@@ -1139,11 +1148,12 @@ export default function DatabasePage() {
                   
                   // Mostrar apenas o caminho atual se não houver navegação (apenas para USER na pasta base)
                   return (
-                    <span className="text-sm font-semibold text-black bg-white px-3 py-1 rounded border border-gray-300 uppercase">
+                    <span className="text-xs md:text-sm font-semibold text-black bg-white px-2.5 md:px-3 py-1 md:py-1.5 rounded border border-gray-300 uppercase flex-shrink-0">
                       {getCurrentFolderPath()}
                     </span>
                   );
                 })()}
+                </div>
               </div>
             </div>
           </div>
@@ -1168,7 +1178,7 @@ export default function DatabasePage() {
                       console.log('Pasta alterada para:', e.target.value);
                       setCurrentFolder(e.target.value);
                     }}
-                    className="w-full md:w-auto px-4 py-3 md:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white text-base md:text-sm touch-manipulation"
+                    className="w-full md:w-auto px-4 py-3 md:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white text-base md:text-sm touch-manipulation min-h-[44px]"
                   >
                     {folders.length > 0 ? (
                       folders.map((folder) => (
@@ -1202,7 +1212,7 @@ export default function DatabasePage() {
                   placeholder="Buscar por animal, raça ou tags..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-3 md:py-2 text-base md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none touch-manipulation min-h-[44px]"
                 />
               </div>
             </div>
@@ -1221,7 +1231,7 @@ export default function DatabasePage() {
                 <select
                   value={fileTypeFilter}
                   onChange={(e) => setFileTypeFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none text-sm"
+                  className="px-3 py-2.5 md:py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none text-base md:text-sm touch-manipulation min-h-[44px]"
                 >
                   <option value="all">Todos</option>
                   <option value="image">Imagens</option>
@@ -1232,11 +1242,11 @@ export default function DatabasePage() {
               </div>
               
               {/* Toggle visualização */}
-              <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+              <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0.5 md:p-1">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded transition-colors ${
-                    viewMode === 'grid' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'
+                  className={`p-2 md:p-1.5 rounded transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
+                    viewMode === 'grid' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
                   }`}
                   title="Visualização em grade"
                 >
@@ -1244,8 +1254,8 @@ export default function DatabasePage() {
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded transition-colors ${
-                    viewMode === 'list' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'
+                  className={`p-2 md:p-1.5 rounded transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center ${
+                    viewMode === 'list' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
                   }`}
                   title="Visualização em lista"
                 >
@@ -1294,7 +1304,7 @@ export default function DatabasePage() {
 
             {/* Renderização Grid ou Lista */}
             {viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
               {files
                 .filter(file => 
                   file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1306,6 +1316,18 @@ export default function DatabasePage() {
                   
                   if (isFolder) {
                     // Card de Pasta - Design menor e preto (estilo Grupo Raça)
+                    // Calcular o caminho completo da pasta
+                    let folderPath: string;
+                    if (file.folder && file.folder !== '*') {
+                      folderPath = `${file.folder}/${file.name}`;
+                    } else {
+                      folderPath = file.name;
+                    }
+                    
+                    // Verificar se está carregando ou selecionada
+                    const isFolderLoading = loadingFolder === folderPath;
+                    const isFolderSelected = currentFolder === folderPath || currentFolder.startsWith(folderPath + '/');
+                    
                     return (
                       <div 
                         key={file.id} 
@@ -1339,16 +1361,35 @@ export default function DatabasePage() {
                           
                           // Verificar se não está tentando navegar para o mesmo lugar
                           if (newPath !== currentFolder) {
+                            setLoadingFolder(newPath); // Marcar pasta como carregando
                             setCurrentFolder(newPath);
                           }
                         }}
-                        className="group bg-black border-2 border-black rounded-lg overflow-hidden hover:bg-gray-900 hover:border-gray-700 transition-all duration-300 hover:shadow-2xl cursor-pointer transform hover:-translate-y-1"
+                        className={`group bg-black border-2 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-2xl cursor-pointer transform hover:-translate-y-1 ${
+                          isFolderSelected 
+                            ? 'border-yellow-400 bg-gray-900 shadow-lg ring-2 ring-yellow-400/50' 
+                            : 'border-black hover:bg-gray-900 hover:border-gray-700'
+                        } ${isFolderLoading ? 'opacity-75' : ''}`}
                       >
                         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-black to-gray-900 flex items-center justify-center p-6">
-                          <Folder size={40} className="text-white group-hover:scale-110 transition-transform duration-300" strokeWidth={2} />
+                          {isFolderLoading ? (
+                            <Loader2 size={40} className="text-yellow-400 animate-spin" strokeWidth={2} />
+                          ) : (
+                            <Folder 
+                              size={40} 
+                              className={`transition-transform duration-300 ${
+                                isFolderSelected ? 'text-yellow-400 scale-110' : 'text-white group-hover:scale-110'
+                              }`} 
+                              strokeWidth={2} 
+                            />
+                          )}
                         </div>
                         <div className="p-2.5 bg-black">
-                          <h3 className="font-semibold text-white text-xs truncate text-center uppercase">{file.name}</h3>
+                          <h3 className={`font-semibold text-xs truncate text-center uppercase ${
+                            isFolderSelected ? 'text-yellow-400' : 'text-white'
+                          }`}>
+                            {file.name}
+                          </h3>
                         </div>
                       </div>
                     );
@@ -1626,17 +1667,58 @@ export default function DatabasePage() {
                     const isFolder = (file as any).type === 'folder' || (file as any).mimeType === 'application/vnd.google-apps.folder';
                     const canDelete = user?.permissions?.delete ?? false;
                     
+                    // Calcular o caminho completo da pasta se for uma pasta
+                    let folderPath: string | null = null;
+                    let isFolderLoading = false;
+                    let isFolderSelected = false;
+                    
+                    if (isFolder) {
+                      if (file.folder && file.folder !== '*') {
+                        folderPath = `${file.folder}/${file.name}`;
+                      } else {
+                        folderPath = file.name;
+                      }
+                      isFolderLoading = loadingFolder === folderPath;
+                      isFolderSelected = currentFolder === folderPath || currentFolder.startsWith(folderPath + '/');
+                    }
+                    
                     return (
                       <div
                         key={file.id}
-                        className={`flex items-center gap-4 p-3 bg-white border-2 rounded-lg hover:shadow-md transition-all ${
-                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                        }`}
+                        onClick={isFolder ? () => {
+                          if (!folderPath) return;
+                          
+                          // Para usuários "user", verificar se a pasta está dentro da pasta base
+                          if (user?.role === 'user') {
+                            const userFolder = user.folder || '';
+                            if (userFolder) {
+                              // Verificar se folderPath está dentro da pasta do usuário
+                              if (folderPath !== userFolder && !folderPath.startsWith(userFolder + '/')) {
+                                setError('Você não tem permissão para acessar esta pasta');
+                                return;
+                              }
+                            }
+                          }
+                          
+                          // Verificar se não está tentando navegar para o mesmo lugar
+                          if (folderPath && folderPath !== currentFolder) {
+                            setLoadingFolder(folderPath); // Marcar pasta como carregando
+                            setCurrentFolder(folderPath);
+                          }
+                        } : undefined}
+                        className={`flex items-center gap-2 md:gap-4 p-3 md:p-3 bg-white border-2 rounded-lg transition-all ${
+                          isFolder ? 'cursor-pointer active:bg-gray-50' : ''
+                        } ${
+                          isSelected ? 'border-blue-500 bg-blue-50' : 
+                          isFolderSelected ? 'border-yellow-400 bg-yellow-50 shadow-md' : 
+                          'border-gray-200 hover:shadow-md'
+                        } ${isFolderLoading ? 'opacity-75' : ''}`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={(e) => {
+                            e.stopPropagation();
                             const newSelected = new Set(selectedFiles);
                             if (e.target.checked) {
                               newSelected.add(file.id);
@@ -1645,18 +1727,27 @@ export default function DatabasePage() {
                             }
                             setSelectedFiles(newSelected);
                           }}
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="w-5 h-5 md:w-5 md:h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 touch-manipulation"
+                          onClick={(e) => e.stopPropagation()}
                         />
                         {isFolder ? (
-                          <Folder size={24} className="text-gray-600" />
+                          isFolderLoading ? (
+                            <Loader2 size={20} className="md:w-6 md:h-6 text-yellow-400 animate-spin flex-shrink-0" />
+                          ) : (
+                            <Folder size={20} className={`md:w-6 md:h-6 flex-shrink-0 ${isFolderSelected ? 'text-yellow-400' : 'text-gray-600'}`} />
+                          )
                         ) : (file as any).mimeType?.startsWith('image/') ? (
-                          <ImageIcon size={24} className="text-gray-600" />
+                          <ImageIcon size={20} className="md:w-6 md:h-6 text-gray-600 flex-shrink-0" />
                         ) : (
-                          <FileText size={24} className="text-gray-600" />
+                          <FileText size={20} className="md:w-6 md:h-6 text-gray-600 flex-shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-black truncate uppercase">{file.name}</h3>
-                          <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+                          <h3 className={`text-sm md:text-base font-semibold truncate uppercase ${
+                            isFolderSelected ? 'text-yellow-600' : 'text-black'
+                          }`}>
+                            {file.name}
+                          </h3>
+                          <div className="flex items-center gap-2 md:gap-4 text-xs text-gray-500 mt-1 flex-wrap">
                             {(file as any).size && (
                               <span>{(parseInt((file as any).size) / 1024 / 1024).toFixed(2)} MB</span>
                             )}
@@ -1668,7 +1759,7 @@ export default function DatabasePage() {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                           {file.url && (
                             <button
                               onClick={(e) => {
@@ -1686,7 +1777,7 @@ export default function DatabasePage() {
                                   window.open(file.url, '_blank', 'noopener,noreferrer');
                                 }
                               }}
-                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-2.5 md:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
                               title="Visualizar"
                             >
                               <Eye size={18} className="text-gray-600" />
@@ -1700,7 +1791,7 @@ export default function DatabasePage() {
                                   setShowRenameModal({ file, type: isFolder ? 'folder' : 'file' });
                                   setRenameValue(file.name);
                                 }}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2.5 md:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
                                 title="Renomear"
                               >
                                 <Edit2 size={18} className="text-gray-600" />
@@ -1710,7 +1801,7 @@ export default function DatabasePage() {
                                   e.stopPropagation();
                                   setShowMoveModal({ file });
                                 }}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2.5 md:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
                                 title="Mover"
                               >
                                 <Move size={18} className="text-gray-600" />
@@ -1723,11 +1814,11 @@ export default function DatabasePage() {
                                 e.stopPropagation();
                                 handleDeleteFile(file.id, file.folder, file.name);
                               }}
-                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Deletar"
-                            >
-                              <Trash2 size={18} className="text-red-600" />
-                            </button>
+                            className="p-2.5 md:p-2 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
+                            title="Deletar"
+                          >
+                            <Trash2 size={18} className="text-red-600" />
+                          </button>
                           )}
                         </div>
                       </div>
@@ -1752,8 +1843,10 @@ export default function DatabasePage() {
           <div className="p-6 border-t border-gray-200 bg-gray-50">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-2xl font-bold text-black">{files.length}</p>
-                <p className="text-sm text-gray-600">Total de Arquivos</p>
+                <p className="text-2xl font-bold text-black">
+                  {files.filter(file => (file as any).type === 'folder' || (file as any).mimeType === 'application/vnd.google-apps.folder').length}
+                </p>
+                <p className="text-sm text-gray-600">Total de Pastas</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-black">
