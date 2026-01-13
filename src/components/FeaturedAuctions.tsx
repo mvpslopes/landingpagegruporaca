@@ -10,6 +10,15 @@ function createDate(year: number, month: number, day: number): Date {
 const auctions = [
   {
     id: 1,
+    title: 'Leilão Haras Santos & Convidados',
+    date: '11 de janeiro a 07 de março',
+    startDate: createDate(2026, 1, 11),
+    endDate: createDate(2026, 3, 7),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L05.jpeg'
+  },
+  {
+    id: 2,
     title: 'Leilão Edição Especial Marchadores de Pista',
     date: '12 de janeiro a 12 de fevereiro',
     startDate: createDate(2026, 1, 12),
@@ -18,7 +27,7 @@ const auctions = [
     image: '/leiloes/L02.jpeg'
   },
   {
-    id: 2,
+    id: 3,
     title: 'Leilão Genética Campeã Haras Pardal',
     date: '19 a 24 de janeiro',
     startDate: createDate(2026, 1, 19),
@@ -27,7 +36,7 @@ const auctions = [
     image: '/leiloes/L03.jpeg'
   },
   {
-    id: 3,
+    id: 4,
     title: 'Leilão Riacho das Pedras e Amigos Mar de Minas',
     date: '19 a 24 de janeiro',
     startDate: createDate(2026, 1, 19),
@@ -36,7 +45,7 @@ const auctions = [
     image: '/leiloes/L07.jpeg'
   },
   {
-    id: 4,
+    id: 5,
     title: 'Semana de Negócios Haras Q-Conforto',
     date: '07 a 12 de fevereiro',
     startDate: createDate(2026, 2, 7),
@@ -45,22 +54,13 @@ const auctions = [
     image: '/leiloes/L01.jpeg'
   },
   {
-    id: 5,
+    id: 6,
     title: 'V Leilão Amigos do Triângulo',
     date: '12 de fevereiro',
     startDate: createDate(2026, 2, 12),
     endDate: createDate(2026, 2, 12),
     breed: 'Campolina Marchador',
     image: '/leiloes/L04.jpeg'
-  },
-  {
-    id: 6,
-    title: 'Leilão Haras Santos & Convidados',
-    date: '02 a 07 de março',
-    startDate: createDate(2026, 3, 2),
-    endDate: createDate(2026, 3, 7),
-    breed: 'Mangalarga Marchador',
-    image: '/leiloes/L05.jpeg'
   },
   {
     id: 7,
