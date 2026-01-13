@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "title": "Leilão 01",
+    "date": "Data a definir",
+    "startDate": "2025-01-01",
+    "endDate": "2025-01-01",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L01.jpeg"
+  },
+  {
+    "id": 2,
+    "title": "Leilão 02",
+    "date": "Data a definir",
+    "startDate": "2025-01-02",
+    "endDate": "2025-01-02",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L02.jpeg"
+  },
+  {
+    "id": 3,
+    "title": "Leilão 03",
+    "date": "Data a definir",
+    "startDate": "2025-01-03",
+    "endDate": "2025-01-03",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L03.jpeg"
+  },
+  {
+    "id": 4,
+    "title": "Leilão 04",
+    "date": "Data a definir",
+    "startDate": "2025-01-04",
+    "endDate": "2025-01-04",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L04.jpeg"
+  },
+  {
+    "id": 5,
+    "title": "Leilão 05",
+    "date": "Data a definir",
+    "startDate": "2025-01-05",
+    "endDate": "2025-01-05",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L05.jpeg"
+  },
+  {
+    "id": 6,
+    "title": "Leilão 06",
+    "date": "Data a definir",
+    "startDate": "2025-01-06",
+    "endDate": "2025-01-06",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L06.jpeg"
+  },
+  {
+    "id": 7,
+    "title": "Leilão 07",
+    "date": "Data a definir",
+    "startDate": "2025-01-07",
+    "endDate": "2025-01-07",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L07.jpeg"
+  }
+]

@@ -1,52 +1,75 @@
-import { Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, Award } from 'lucide-react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
-// Função auxiliar para criar datas de dezembro do ano atual
-function createDecemberDate(day: number): Date {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  // Se estamos em janeiro e os leilões são de dezembro, usar o ano anterior
-  // Caso contrário, usar o ano atual
-  const year = now.getMonth() === 0 && day > 1 ? currentYear - 1 : currentYear;
-  return new Date(year, 11, day); // Dezembro é mês 11 (0-indexed)
+// Função auxiliar para criar datas
+function createDate(year: number, month: number, day: number): Date {
+  return new Date(year, month - 1, day); // month é 1-indexed, Date usa 0-indexed
 }
 
+// LEILÕES - Ordem cronológica (por data de início)
 const auctions = [
   {
     id: 1,
-    title: '3º Shopping Haras Baependi',
-    date: '08 a 13 de Dezembro',
-    startDate: createDecemberDate(8),
-    endDate: createDecemberDate(13),
+    title: 'Leilão Edição Especial Marchadores de Pista',
+    date: '12 de janeiro a 12 de fevereiro',
+    startDate: createDate(2026, 1, 12),
+    endDate: createDate(2026, 2, 12),
     breed: 'Mangalarga Marchador',
-    image: '/Leilao-08-13-12.jpg'
+    image: '/leiloes/L02.jpeg'
   },
   {
     id: 2,
-    title: 'Genética Campeã Haras Luxor',
-    date: '09 a 13 de Dezembro',
-    startDate: createDecemberDate(9),
-    endDate: createDecemberDate(13),
+    title: 'Leilão Genética Campeã Haras Pardal',
+    date: '19 a 24 de janeiro',
+    startDate: createDate(2026, 1, 19),
+    endDate: createDate(2026, 1, 24),
     breed: 'Mangalarga Marchador',
-    image: '/Leilao-09a13-12.jpg'
+    image: '/leiloes/L03.jpeg'
   },
   {
     id: 3,
-    title: 'I Leilão Encantos da Marcha',
-    date: '11 de Dezembro',
-    startDate: createDecemberDate(11),
-    endDate: createDecemberDate(11),
-    breed: 'Campolina Marchador',
-    image: '/Leilao-11-12-25.jpg' // Certifique-se de que a imagem está em GrupoRaca_/public/
+    title: 'Leilão Riacho das Pedras e Amigos Mar de Minas',
+    date: '19 a 24 de janeiro',
+    startDate: createDate(2026, 1, 19),
+    endDate: createDate(2026, 1, 24),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L07.jpeg'
   },
   {
     id: 4,
-    title: 'Genética Campeã Haras Pardal',
-    date: '15 a 20 de Dezembro',
-    startDate: createDecemberDate(15),
-    endDate: createDecemberDate(20),
+    title: 'Semana de Negócios Haras Q-Conforto',
+    date: '07 a 12 de fevereiro',
+    startDate: createDate(2026, 2, 7),
+    endDate: createDate(2026, 2, 12),
     breed: 'Mangalarga Marchador',
-    image: '/Leilao-15-20-12.jpg'
+    image: '/leiloes/L01.jpeg'
+  },
+  {
+    id: 5,
+    title: 'V Leilão Amigos do Triângulo',
+    date: '12 de fevereiro',
+    startDate: createDate(2026, 2, 12),
+    endDate: createDate(2026, 2, 12),
+    breed: 'Campolina Marchador',
+    image: '/leiloes/L04.jpeg'
+  },
+  {
+    id: 6,
+    title: 'Leilão Haras Santos & Convidados',
+    date: '02 a 07 de março',
+    startDate: createDate(2026, 3, 2),
+    endDate: createDate(2026, 3, 7),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L05.jpeg'
+  },
+  {
+    id: 7,
+    title: 'Select Week Limeira da Flor',
+    date: '15 a 21 de março',
+    startDate: createDate(2026, 3, 15),
+    endDate: createDate(2026, 3, 21),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L06.jpeg'
   }
 ];
 
@@ -146,17 +169,22 @@ export default function FeaturedAuctions() {
                   {auction.breed && (
                     <div className="flex items-center text-gray-700 group-hover:text-black transition-colors">
                       <div className="w-10 h-10 rounded-lg bg-gray-100 group-hover:bg-black group-hover:text-white flex items-center justify-center mr-3 transition-all duration-300">
-                        <MapPin size={18} />
+                        <Award size={18} />
                       </div>
                       <span className="font-medium uppercase">{auction.breed}</span>
                     </div>
                   )}
                 </div>
 
-                <button className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02] button-shine ripple-effect">
+                <a
+                  href="https://gruporaca.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02] button-shine ripple-effect"
+                >
                   Ver Detalhes
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </button>
+                </a>
               </div>
             </div>
           ))}

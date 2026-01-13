@@ -53,7 +53,6 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GABRIEL QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GREGÓRIO': { phone: '(21) 98166-1949', whatsapp: '5521981661949', email: 'gregorio.neves@gruporaca.com.br' },
-  'BRUNO LAGARTIXA': { phone: '(31) 97153-7765', whatsapp: '5531971537765', email: 'bruno.lagartixa@gruporaca.com.br' },
   'DUDU': { phone: '(34) 98406-2220', whatsapp: '5534984062220', email: 'dudu.idualte@gruporaca.com.br' },
   'DUDU IDUALTE': { phone: '(34) 98406-2220', whatsapp: '5534984062220', email: 'dudu.idualte@gruporaca.com.br' },
   'MARCELO': { phone: '(32) 99905-4175', whatsapp: '5532999054175', email: 'marcelo.tranca@gruporaca.com.br' },
@@ -140,7 +139,6 @@ function createAssessor(name: string, id: number) {
 // Assessoria Grupo Raça (David Charles primeiro, demais em ordem alfabética)
 const assessoriaGrupoRacaList = [
   'BRUNO SOUZA LIMA',
-  'BRUNO LAGARTIXA',
   'DUDU GUIDUCCI',
   'DUDU ÁGUIA',
   'ERICK',
