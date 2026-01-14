@@ -193,13 +193,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// DELETE: Deletar arquivo
+// DELETE: Deletar arquivo ou pasta
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $fileId = $_GET['id'] ?? null;
     $folder = $_GET['folder'] ?? '*';
+    $type = $_GET['type'] ?? 'file'; // 'file' ou 'folder'
     
     if (!$fileId) {
         jsonError('ID do arquivo é obrigatório');
+    }
+    
+    // Se for uma pasta, verificar se está vinculada a um usuário
+    if ($type === 'folder') {
+        // Obter o nome da pasta do Google Drive
+        try {
+            $file = $driveService->getService()->files->get($fileId, [
+                'fields' => 'name',
+                'supportsAllDrives' => true
+            ]);
+            $folderName = $file->getName();
+            
+            // Verificar se a pasta está vinculada a um usuário
+            if (isFolderLinkedToUser($folderName)) {
+                jsonError('Não é possível deletar esta pasta. Ela está vinculada a um perfil de usuário.', 403);
+            }
+        } catch (Exception $e) {
+            error_log('Erro ao verificar pasta antes de deletar: ' . $e->getMessage());
+            // Continuar com a verificação de permissão mesmo se houver erro
+        }
     }
     
     // Verificar permissão de delete
@@ -217,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         $driveService->deleteFile($fileId);
         jsonResponse([
             'success' => true,
-            'message' => 'Arquivo deletado com sucesso',
+            'message' => ($type === 'folder' ? 'Pasta' : 'Arquivo') . ' deletado com sucesso',
             'storage' => 'google_drive'
         ]);
     } catch (Exception $e) {
@@ -242,6 +263,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
         // Validar nome (deve estar em maiúsculas)
         if (preg_match('/[a-z]/', $newName)) {
             jsonError('O nome deve estar em MAIÚSCULAS', 400);
+        }
+        
+        // Se for uma pasta, verificar se está vinculada a um usuário
+        if ($type === 'folder') {
+            // Obter o nome atual da pasta do Google Drive
+            try {
+                $file = $driveService->getService()->files->get($fileId, [
+                    'fields' => 'name',
+                    'supportsAllDrives' => true
+                ]);
+                $currentFolderName = $file->getName();
+                
+                // Verificar se a pasta atual está vinculada a um usuário
+                if (isFolderLinkedToUser($currentFolderName)) {
+                    jsonError('Não é possível renomear esta pasta. Ela está vinculada a um perfil de usuário.', 403);
+                }
+                
+                // Verificar se o novo nome também não está vinculado a outro usuário
+                $normalizedNewName = strtoupper(trim($newName));
+                if (isFolderLinkedToUser($normalizedNewName)) {
+                    jsonError('O novo nome da pasta está vinculado a outro perfil de usuário. Escolha outro nome.', 403);
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao verificar pasta antes de renomear: ' . $e->getMessage());
+                // Continuar com a verificação de permissão mesmo se houver erro
+            }
         }
         
         // Verificar permissão de upload (necessária para renomear)

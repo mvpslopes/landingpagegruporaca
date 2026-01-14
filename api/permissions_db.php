@@ -183,6 +183,46 @@ function canAccessFolder($user, $folder) {
 }
 
 /**
+ * Verificar se uma pasta está vinculada a um usuário do tipo "user"
+ * Retorna true se a pasta está vinculada, false caso contrário
+ */
+function isFolderLinkedToUser($folderName) {
+    if (empty($folderName) || $folderName === '*') {
+        return false;
+    }
+    
+    try {
+        $conn = getDBConnection();
+        
+        // Normalizar nome da pasta para comparação (maiúsculas)
+        $normalizedFolderName = strtoupper(trim($folderName));
+        
+        // Buscar usuários do tipo "user" que tenham esta pasta vinculada
+        $stmt = $conn->prepare("
+            SELECT id, email, name, folder 
+            FROM users 
+            WHERE role = 'user' 
+            AND active = 1 
+            AND folder = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$normalizedFolderName]);
+        $user = $stmt->fetch();
+        
+        if ($user) {
+            error_log("Pasta '{$normalizedFolderName}' está vinculada ao usuário: {$user['email']} (ID: {$user['id']})");
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("Erro ao verificar se pasta está vinculada a usuário: " . $e->getMessage());
+        // Em caso de erro, retornar true para ser mais seguro (bloquear)
+        return true;
+    }
+}
+
+/**
  * Criar novo usuário (apenas ROOT)
  */
 function createUser($rootUser, $userData) {
@@ -235,6 +275,9 @@ function createUser($rootUser, $userData) {
         // Hash da senha
         $passwordHash = password_hash($userData['password'], PASSWORD_BCRYPT);
         
+        // Lista de pastas bloqueadas (não criar automaticamente)
+        $blockedFolders = ['AQUITEMRACA'];
+        
         // Se for usuário "user" e não tiver pasta definida, gerar automaticamente a partir do email
         $userFolder = $userData['folder'] ?? '';
         if (($userData['role'] ?? 'user') === 'user' && empty($userFolder)) {
@@ -242,9 +285,22 @@ function createUser($rootUser, $userData) {
             $emailPrefix = explode('@', $userData['email'])[0];
             // Remover caracteres especiais e converter para MAIÚSCULAS
             $userFolder = strtoupper(preg_replace('/[^a-z0-9]/', '', $emailPrefix));
+            
+            // Verificar se a pasta está bloqueada
+            if (in_array($userFolder, $blockedFolders)) {
+                // Não criar pasta automaticamente se estiver bloqueada
+                $blockedFolderName = $userFolder;
+                $userFolder = '';
+                error_log("Pasta bloqueada detectada: {$blockedFolderName}. Pasta não será criada automaticamente.");
+            }
         } else if (!empty($userFolder)) {
             // Se a pasta foi fornecida, garantir que está em maiúsculas
             $userFolder = strtoupper(trim($userFolder));
+            
+            // Verificar se a pasta está bloqueada
+            if (in_array($userFolder, $blockedFolders)) {
+                return ['success' => false, 'error' => "A pasta '{$userFolder}' está bloqueada e não pode ser usada"];
+            }
         }
         
         // Inserir usuário
@@ -271,7 +327,8 @@ function createUser($rootUser, $userData) {
         
         // Criar pasta raiz no Google Drive se o usuário tiver uma pasta definida
         // (userFolder já foi definido acima, pode ser gerado automaticamente ou fornecido)
-        if ($userData['role'] === 'user' && !empty($userFolder) && $userFolder !== '*') {
+        // Não criar se a pasta estiver bloqueada
+        if ($userData['role'] === 'user' && !empty($userFolder) && $userFolder !== '*' && !in_array($userFolder, $blockedFolders)) {
             try {
                 require_once __DIR__ . '/drive_service.php';
                 require_once __DIR__ . '/oauth_token_storage.php';
@@ -397,6 +454,133 @@ function updateUserPermissions($rootUser, $userId, $permissions) {
     } catch (PDOException $e) {
         error_log("Erro ao atualizar permissões: " . $e->getMessage());
         return ['success' => false, 'error' => 'Erro ao atualizar permissões'];
+    }
+}
+
+/**
+ * Atualizar usuário completo (apenas ROOT)
+ */
+function updateUser($rootUser, $userId, $userData) {
+    // Apenas ROOT pode editar usuários
+    if (($rootUser['role'] ?? '') !== 'root') {
+        return ['success' => false, 'error' => 'Apenas ROOT pode editar usuários'];
+    }
+    
+    try {
+        $conn = getDBConnection();
+        
+        // Verificar se usuário existe e não é ROOT
+        $stmt = $conn->prepare("SELECT id, role, email FROM users WHERE id = ? AND active = 1 LIMIT 1");
+        $stmt->execute([$userId]);
+        $existingUser = $stmt->fetch();
+        
+        if (!$existingUser) {
+            return ['success' => false, 'error' => 'Usuário não encontrado'];
+        }
+        
+        if ($existingUser['role'] === 'root') {
+            return ['success' => false, 'error' => 'Não é possível editar o usuário ROOT'];
+        }
+        
+        // Se o email foi alterado, verificar se já existe
+        if (isset($userData['email']) && $userData['email'] !== $existingUser['email']) {
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1");
+            $stmt->execute([$userData['email'], $userId]);
+            if ($stmt->fetch()) {
+                return ['success' => false, 'error' => 'Email já cadastrado'];
+            }
+        }
+        
+        // Construir query de atualização dinamicamente
+        $updateFields = [];
+        $updateValues = [];
+        
+        if (isset($userData['name'])) {
+            $updateFields[] = "name = ?";
+            $updateValues[] = $userData['name'];
+        }
+        
+        if (isset($userData['email'])) {
+            $updateFields[] = "email = ?";
+            $updateValues[] = $userData['email'];
+        }
+        
+        if (isset($userData['password']) && !empty($userData['password'])) {
+            $updateFields[] = "password = ?";
+            $updateValues[] = password_hash($userData['password'], PASSWORD_BCRYPT);
+        }
+        
+        if (isset($userData['role'])) {
+            $updateFields[] = "role = ?";
+            $updateValues[] = $userData['role'];
+            
+            // Atualizar permissões baseadas no novo role
+            $permissions = [];
+            if ($userData['role'] === 'user') {
+                $permissions = [
+                    'upload' => true,
+                    'download' => true,
+                    'delete' => false,
+                    'view_all' => false,
+                    'manage_users' => false,
+                    'manage_permissions' => false
+                ];
+            } elseif ($userData['role'] === 'viewer') {
+                $permissions = [
+                    'upload' => true,
+                    'download' => true,
+                    'delete' => false,
+                    'view_all' => true,
+                    'manage_users' => false,
+                    'manage_permissions' => false
+                ];
+            } elseif ($userData['role'] === 'admin') {
+                $permissions = [
+                    'upload' => true,
+                    'download' => true,
+                    'delete' => true,
+                    'view_all' => true,
+                    'manage_users' => false,
+                    'manage_permissions' => false
+                ];
+            }
+            
+            if (!empty($permissions)) {
+                $updateFields[] = "permissions = ?";
+                $updateValues[] = json_encode($permissions);
+            }
+        }
+        
+        if (isset($userData['folder'])) {
+            $updateFields[] = "folder = ?";
+            $updateValues[] = strtoupper(trim($userData['folder']));
+        }
+        
+        if (empty($updateFields)) {
+            return ['success' => false, 'error' => 'Nenhum campo para atualizar'];
+        }
+        
+        // Adicionar ID ao final dos valores
+        $updateValues[] = $userId;
+        
+        // Executar atualização
+        $sql = "UPDATE users SET " . implode(', ', $updateFields) . " WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($updateValues);
+        
+        // Buscar usuário atualizado
+        $updatedUser = getUserById($userId);
+        unset($updatedUser['password']);
+        
+        // Log de auditoria
+        logAudit($rootUser['id'], 'update_user', 'user', $userId, [
+            'updated_fields' => array_keys($userData)
+        ]);
+        
+        return ['success' => true, 'user' => $updatedUser];
+    } catch (PDOException $e) {
+        error_log("Erro ao atualizar usuário: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Erro ao atualizar usuário no banco de dados'];
     }
 }
 

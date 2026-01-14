@@ -170,6 +170,35 @@ export async function createUser(userData: {
   }
 }
 
+export async function updateUser(userId: number, userData: {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: 'root' | 'admin' | 'viewer' | 'user';
+  folder?: string;
+}): Promise<ApiResponse<User>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users.php`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ id: userId, ...userData }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao atualizar usuário');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao atualizar usuário' };
+  }
+}
+
 export async function deleteUser(userId: number): Promise<ApiResponse<null>> {
   try {
     const response = await fetch(`${API_BASE_URL}/users.php?id=${userId}`, {
@@ -271,9 +300,9 @@ export async function uploadFile(file: File, folder: string): Promise<ApiRespons
   }
 }
 
-export async function deleteFile(fileId: string, folder: string): Promise<ApiResponse<null>> {
+export async function deleteFile(fileId: string, folder: string, type: 'file' | 'folder' = 'file'): Promise<ApiResponse<null>> {
   try {
-    const response = await fetch(`${API_BASE_URL}/files.php?id=${encodeURIComponent(fileId)}&folder=${encodeURIComponent(folder)}`, {
+    const response = await fetch(`${API_BASE_URL}/files.php?id=${encodeURIComponent(fileId)}&folder=${encodeURIComponent(folder)}&type=${type}`, {
       method: 'DELETE',
       credentials: 'include',
     });

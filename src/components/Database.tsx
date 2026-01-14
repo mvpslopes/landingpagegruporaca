@@ -42,7 +42,7 @@ export default function DatabasePage() {
   const [previewImageLoading, setPreviewImageLoading] = useState(true);
   const [previewImageBlobUrl, setPreviewImageBlobUrl] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ fileId: string; folder: string; fileName: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ fileId: string; folder: string; fileName: string; type?: 'file' | 'folder' } | null>(null);
   const [fileTypeFilter, setFileTypeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showRenameModal, setShowRenameModal] = useState<{ file: FileItem; type: 'file' | 'folder' } | null>(null);
@@ -673,26 +673,32 @@ export default function DatabasePage() {
     
     // Mostrar modal de confirmação
     const file = files.find(f => f.id === fileId);
-    setShowDeleteConfirm({ fileId, folder, fileName: fileName || file?.name || 'este item' });
+    const isFolder = (file as any)?.type === 'folder' || (file as any)?.mimeType === 'application/vnd.google-apps.folder';
+    setShowDeleteConfirm({ 
+      fileId, 
+      folder, 
+      fileName: fileName || file?.name || 'este item',
+      type: isFolder ? 'folder' : 'file'
+    });
   };
 
   const confirmDelete = async () => {
     if (!showDeleteConfirm) return;
     
-    const { fileId, folder } = showDeleteConfirm;
+    const { fileId, folder, type = 'file' } = showDeleteConfirm;
     setLoading(true);
     setShowDeleteConfirm(null);
     
     try {
-      const response = await api.deleteFile(fileId, folder);
+      const response = await api.deleteFile(fileId, folder, type);
       if (response.error) {
         addToast(response.error, 'error');
       } else {
-        addToast('Arquivo deletado com sucesso', 'success');
+        addToast((type === 'folder' ? 'Pasta' : 'Arquivo') + ' deletado com sucesso', 'success');
         await loadFiles(); // Recarregar lista
       }
     } catch (err: any) {
-      addToast(err.message || 'Erro ao deletar arquivo', 'error');
+      addToast(err.message || 'Erro ao deletar', 'error');
     } finally {
       setLoading(false);
     }
@@ -1313,6 +1319,7 @@ export default function DatabasePage() {
                 .map(file => {
                   // Verificar se é pasta (pode vir do tipo ou do mimeType)
                   const isFolder = (file as any).type === 'folder' || (file as any).mimeType === 'application/vnd.google-apps.folder';
+                  const canDelete = user?.permissions?.delete ?? false;
                   
                   if (isFolder) {
                     // Card de Pasta - Design menor e preto (estilo Grupo Raça)
@@ -1383,6 +1390,90 @@ export default function DatabasePage() {
                               strokeWidth={2} 
                             />
                           )}
+                          {/* Botões de ação no hover (desktop) - sempre visíveis para debug */}
+                          <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 z-20">
+                            <div className="flex gap-2">
+                              {user?.permissions?.upload && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowRenameModal({ file, type: 'folder' });
+                                      setRenameValue(file.name);
+                                    }}
+                                    className="p-2.5 md:p-2 bg-blue-500/90 backdrop-blur-sm rounded-lg hover:bg-blue-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    title="Renomear"
+                                  >
+                                    <Edit2 size={18} className="text-white md:w-4 md:h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowMoveModal({ file });
+                                    }}
+                                    className="p-2.5 md:p-2 bg-yellow-500/90 backdrop-blur-sm rounded-lg hover:bg-yellow-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    title="Mover"
+                                  >
+                                    <Move size={18} className="text-white md:w-4 md:h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {canDelete && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFile(file.id, file.folder, file.name);
+                                  }}
+                                  className="p-2.5 md:p-2 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                  title="Deletar"
+                                >
+                                  <Trash2 size={18} className="text-white md:w-4 md:h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {/* Botões sempre visíveis no mobile */}
+                          <div className="md:hidden absolute top-2 right-2 z-10">
+                            <div className="flex gap-2">
+                              {user?.permissions?.upload && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowRenameModal({ file, type: 'folder' });
+                                      setRenameValue(file.name);
+                                    }}
+                                    className="p-2.5 bg-blue-500/90 backdrop-blur-sm rounded-lg hover:bg-blue-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    title="Renomear"
+                                  >
+                                    <Edit2 size={18} className="text-white" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowMoveModal({ file });
+                                    }}
+                                    className="p-2.5 bg-yellow-500/90 backdrop-blur-sm rounded-lg hover:bg-yellow-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                    title="Mover"
+                                  >
+                                    <Move size={18} className="text-white" />
+                                  </button>
+                                </>
+                              )}
+                              {canDelete && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFile(file.id, file.folder, file.name);
+                                  }}
+                                  className="p-2.5 bg-red-500/90 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                                  title="Deletar"
+                                >
+                                  <Trash2 size={18} className="text-white" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="p-2.5 bg-black">
                           <h3 className={`font-semibold text-xs truncate text-center uppercase ${
@@ -1545,7 +1636,7 @@ export default function DatabasePage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setShowRenameModal({ file, type: file.type === 'folder' ? 'folder' : 'file' });
+                                    setShowRenameModal({ file, type: isFolder ? 'folder' : 'file' });
                                     setRenameValue(file.name);
                                   }}
                                   className="p-2.5 md:p-2 bg-blue-500/90 backdrop-blur-sm rounded-lg hover:bg-blue-600 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -2261,7 +2352,8 @@ export default function DatabasePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setShowRenameModal({ file: previewFile, type: previewFile.type === 'folder' ? 'folder' : 'file' });
+                          const isPreviewFolder = (previewFile as any).type === 'folder' || (previewFile as any).mimeType === 'application/vnd.google-apps.folder';
+                          setShowRenameModal({ file: previewFile, type: isPreviewFolder ? 'folder' : 'file' });
                           setRenameValue(previewFile.name);
                           setPreviewFile(null);
                         }}
@@ -2494,6 +2586,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -2543,6 +2636,54 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
     }
   };
 
+  const handleEditUser = (userToEdit: User) => {
+    setEditingUser(userToEdit);
+    setFormData({
+      email: userToEdit.email,
+      password: '', // Não preencher senha
+      name: userToEdit.name,
+      role: userToEdit.role,
+      folder: userToEdit.folder || ''
+    });
+    setShowCreateForm(false);
+    setError('');
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const updateData: any = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        folder: formData.folder
+      };
+
+      // Só incluir senha se foi preenchida
+      if (formData.password) {
+        updateData.password = formData.password;
+      }
+
+      const response = await api.updateUser(editingUser.id, updateData);
+      if (response.user) {
+        setEditingUser(null);
+        setFormData({ email: '', password: '', name: '', role: 'user', folder: '' });
+        await loadUsers();
+      } else if (response.error) {
+        setError(response.error);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao atualizar usuário');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (userId: number) => {
     if (!confirm('Tem certeza que deseja deletar este usuário?')) return;
 
@@ -2581,8 +2722,8 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
           </button>
         </div>
 
-        {showCreateForm && (
-          <form onSubmit={handleCreateUser} className="bg-gray-50 p-4 rounded-lg space-y-3">
+        {(showCreateForm || editingUser) && (
+          <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} className="bg-gray-50 p-4 rounded-lg space-y-3">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
               <input
@@ -2594,12 +2735,14 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Senha</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Senha {editingUser && <span className="text-xs text-gray-500 font-normal">(deixe em branco para não alterar)</span>}
+              </label>
               <input
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
+                required={!editingUser}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
               />
             </div>
@@ -2657,6 +2800,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
                 type="button"
                 onClick={() => {
                   setShowCreateForm(false);
+                  setEditingUser(null);
                   setFormData({ email: '', password: '', name: '', role: 'user', folder: '' });
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
@@ -2668,7 +2812,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
                 disabled={loading}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
               >
-                Criar
+                {editingUser ? 'Atualizar' : 'Criar'}
               </button>
             </div>
           </form>
@@ -2699,13 +2843,23 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
                     )}
                   </div>
                   {u.role !== 'root' && (
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      disabled={loading}
-                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
-                    >
-                      Deletar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditUser(u)}
+                        disabled={loading}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <Edit2 size={14} />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(u.id)}
+                        disabled={loading}
+                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
+                      >
+                        Deletar
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

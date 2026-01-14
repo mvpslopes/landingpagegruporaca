@@ -94,6 +94,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 }
 
+// PATCH: Atualizar perfil completo do usuário
+if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $userId = $data['id'] ?? null;
+    
+    if (!$userId) {
+        jsonError('ID do usuário é obrigatório');
+    }
+    
+    // Remover 'id' dos dados para não tentar atualizar o ID
+    unset($data['id']);
+    
+    $result = updateUser($user, $userId, $data);
+    
+    if ($result['success']) {
+        jsonResponse($result);
+    } else {
+        jsonError($result['error'] ?? 'Erro ao atualizar usuário', 400);
+    }
+}
+
 jsonError('Método não permitido', 405);
 ?>
 
