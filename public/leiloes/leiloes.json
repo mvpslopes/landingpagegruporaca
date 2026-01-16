@@ -61,5 +61,23 @@
     "endDate": "2025-01-07",
     "breed": "Mangalarga Marchador",
     "image": "/leiloes/L07.jpeg"
+  },
+  {
+    "id": 8,
+    "title": "XV Leilão J.H.R.",
+    "date": "04/07/2026",
+    "startDate": "2026-07-04",
+    "endDate": "2026-07-04",
+    "breed": "Campolina Marchador",
+    "image": "/leiloes/L08.jpeg"
+  },
+  {
+    "id": 9,
+    "title": "1º Leilão Matrizes Haras 2ª Geração",
+    "date": "14/01/2026 - 14/02/2026",
+    "startDate": "2026-01-14",
+    "endDate": "2026-02-14",
+    "breed": "Mangalarga Marchador",
+    "image": "/leiloes/L09.jpeg"
   }
 ]

@@ -70,6 +70,24 @@ const auctions = [
     endDate: createDate(2026, 3, 21),
     breed: 'Mangalarga Marchador',
     image: '/leiloes/L06.jpeg'
+  },
+  {
+    id: 8,
+    title: 'XV Leilão J.H.R.',
+    date: '04 de julho',
+    startDate: createDate(2026, 7, 4),
+    endDate: createDate(2026, 7, 4),
+    breed: 'Campolina Marchador',
+    image: '/leiloes/L08.jpeg'
+  },
+  {
+    id: 9,
+    title: '1º Leilão Matrizes Haras 2ª Geração',
+    date: '14 de janeiro a 14 de fevereiro',
+    startDate: createDate(2026, 1, 14),
+    endDate: createDate(2026, 2, 14),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L09.jpeg'
   }
 ];
 
