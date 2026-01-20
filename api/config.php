@@ -18,7 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Configurações
 define('USERS_FILE', __DIR__ . '/data/users.json');
 define('METADATA_DIR', __DIR__ . '/data/metadata');
-define('SESSION_TIMEOUT', 300); // 5 minutos
+// Tempo máximo de sessão/inatividade (em segundos)
+// 3600 = 1 hora – necessário para uploads grandes (700MB+)
+define('SESSION_TIMEOUT', 3600);
 
 // Criar diretórios se não existirem
 if (!file_exists(__DIR__ . '/data')) {

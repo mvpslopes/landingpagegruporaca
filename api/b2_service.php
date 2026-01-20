@@ -212,8 +212,14 @@ class B2Service {
             
             // Verificar tipo de arquivo
             $mimeType = mime_content_type($filePath);
-            if (!in_array($mimeType, $this->config['upload']['allowed_types'])) {
-                throw new Exception('Tipo de arquivo não permitido: ' . $mimeType);
+            
+            // Verificar se o tipo está na lista permitida OU se é um tipo de vídeo/imagem genérico
+            $isAllowed = in_array($mimeType, $this->config['upload']['allowed_types']);
+            $isVideo = strpos($mimeType, 'video/') === 0;
+            $isImage = strpos($mimeType, 'image/') === 0;
+            
+            if (!$isAllowed && !$isVideo && !$isImage) {
+                throw new Exception('Tipo de arquivo não permitido: ' . $mimeType . '. Tipos permitidos: imagens, vídeos, PDF e documentos Office.');
             }
             
             // Construir caminho completo do arquivo no B2

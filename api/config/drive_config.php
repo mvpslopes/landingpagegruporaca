@@ -27,7 +27,8 @@ return [
     
     // Configurações de upload
     'upload' => [
-        'max_file_size' => 100 * 1024 * 1024, // 100MB
+        'max_file_size' => 1024 * 1024 * 1024, // 1GB (Google Drive suporta até 5TB)
+        'chunk_size' => 256 * 1024, // 256KB por chunk para upload resumável
         'allowed_types' => [
             'image/jpeg',
             'image/png',
@@ -35,7 +36,12 @@ return [
             'image/webp',
             'application/pdf',
             'video/mp4',
-            'video/quicktime',
+            'video/mpeg',
+            'video/quicktime', // .mov
+            'video/x-msvideo', // .avi
+            'video/x-ms-wmv', // .wmv
+            'video/webm', // .webm
+            'video/x-matroska', // .mkv
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
             'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx

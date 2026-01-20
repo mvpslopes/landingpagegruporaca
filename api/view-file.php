@@ -48,10 +48,11 @@ try {
     // Verificar se o usuário tem acesso ao arquivo
     // (implementar verificação de permissões se necessário)
     
-    // Verificar se é imagem
+    // Verificar se é imagem ou vídeo
     $isImage = strpos($fileInfo['mimeType'] ?? '', 'image/') === 0;
+    $isVideo = strpos($fileInfo['mimeType'] ?? '', 'video/') === 0;
     
-    if ($isImage) {
+    if ($isImage || $isVideo) {
         // Para imagens, usar o método correto da API do Google Drive
         try {
             $service = $driveService->getService();
@@ -107,7 +108,99 @@ try {
                 // Construir URL de download direto usando a API v3
                 $apiUrl = "https://www.googleapis.com/drive/v3/files/{$fileId}?alt=media";
                 
-                // Usar cURL para baixar o conteúdo com autenticação
+                // Obter tamanho do arquivo
+                $fileSize = $fileInfo['size'] ?? null;
+                
+                // Suporte a Range Requests (HTTP 206) para vídeos
+                $range = $_SERVER['HTTP_RANGE'] ?? null;
+                $start = 0;
+                $end = $fileSize ? ($fileSize - 1) : null;
+                
+                if ($range && preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {
+                    $start = intval($matches[1]);
+                    if (!empty($matches[2])) {
+                        $end = intval($matches[2]);
+                    }
+                    if ($fileSize && $end >= $fileSize) {
+                        $end = $fileSize - 1;
+                    }
+                }
+                
+                // Para arquivos grandes (> 50MB), usar streaming direto (sem carregar na memória)
+                $useStreaming = $fileSize && $fileSize > 50 * 1024 * 1024; // > 50MB
+                
+                if ($useStreaming) {
+                    // Streaming direto: servidor faz proxy do Google Drive para o usuário
+                    // Sem carregar o arquivo na memória PHP
+                    
+                    // Limpar qualquer output anterior completamente
+                    while (ob_get_level()) {
+                        ob_end_clean();
+                    }
+                    
+                    // Definir headers apropriados
+                    header('Content-Type: ' . ($fileInfo['mimeType'] ?? ($isImage ? 'image/jpeg' : 'video/mp4')));
+                    
+                    if ($range && $fileSize) {
+                        // Suporte a Range Request (HTTP 206) - essencial para streaming de vídeo
+                        $contentLength = ($end - $start + 1);
+                        header('HTTP/1.1 206 Partial Content');
+                        header('Content-Length: ' . $contentLength);
+                        header('Content-Range: bytes ' . $start . '-' . $end . '/' . $fileSize);
+                        header('Accept-Ranges: bytes');
+                    } else {
+                        if ($fileSize) {
+                            header('Content-Length: ' . $fileSize);
+                        }
+                        header('Accept-Ranges: bytes');
+                    }
+                    
+                    header('Cache-Control: public, max-age=3600');
+                    header('Access-Control-Allow-Origin: *');
+                    header('Access-Control-Allow-Credentials: true');
+                    header('X-Content-Type-Options: nosniff');
+                    
+                    // Configurar cURL para streaming direto
+                    $ch = curl_init($apiUrl);
+                    
+                    $headers = [
+                        'Authorization: Bearer ' . $accessToken['access_token']
+                    ];
+                    
+                    // Adicionar Range header se necessário
+                    if ($range && $fileSize) {
+                        $headers[] = 'Range: bytes=' . $start . '-' . ($end !== null ? $end : '');
+                    }
+                    
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) {
+                        echo $data;
+                        flush();
+                        return strlen($data);
+                    });
+                    
+                    // Timeout aumentado para arquivos grandes (30 minutos)
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 1800);
+                    
+                    // Executar streaming
+                    $success = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $error = curl_error($ch);
+                    curl_close($ch);
+                    
+                    if ($success && ($httpCode === 200 || $httpCode === 206) && !$error) {
+                        flush();
+                        exit;
+                    } else {
+                        error_log("Erro ao fazer streaming: HTTP {$httpCode}, Erro: {$error}");
+                        // Continuar para fallback
+                    }
+                }
+                
+                // Para arquivos pequenos, usar método tradicional (carrega na memória, mas é OK para < 50MB)
                 $ch = curl_init($apiUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -128,12 +221,16 @@ try {
                     }
                     
                     // Definir headers apropriados
-                    header('Content-Type: ' . ($fileInfo['mimeType'] ?? 'image/jpeg'));
+                    header('Content-Type: ' . ($fileInfo['mimeType'] ?? ($isImage ? 'image/jpeg' : 'video/mp4')));
                     header('Content-Length: ' . strlen($content));
                     header('Cache-Control: public, max-age=3600');
                     header('Access-Control-Allow-Origin: *');
                     header('Access-Control-Allow-Credentials: true');
                     header('X-Content-Type-Options: nosniff');
+                    // Para vídeos, permitir range requests (streaming)
+                    if ($isVideo) {
+                        header('Accept-Ranges: bytes');
+                    }
                     
                     // Enviar conteúdo diretamente
                     echo $content;
@@ -147,32 +244,77 @@ try {
                         $separator = strpos($fileInfo['downloadLink'], '?') !== false ? '&' : '?';
                         $downloadUrlWithToken = $fileInfo['downloadLink'] . $separator . 'access_token=' . urlencode($accessToken['access_token']);
                         
-                        $ch = curl_init($downloadUrlWithToken);
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                        $content = curl_exec($ch);
-                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        $error = curl_error($ch);
-                        curl_close($ch);
-                        
-                        if ($httpCode === 200 && $content !== false && !$error && strlen($content) > 0) {
+                        // Para arquivos grandes, usar streaming também no fallback
+                        if ($useStreaming) {
                             // Limpar qualquer output anterior completamente
                             while (ob_get_level()) {
                                 ob_end_clean();
                             }
                             
-                            header('Content-Type: ' . ($fileInfo['mimeType'] ?? 'image/jpeg'));
-                            header('Content-Length: ' . strlen($content));
+                            header('Content-Type: ' . ($fileInfo['mimeType'] ?? ($isImage ? 'image/jpeg' : 'video/mp4')));
+                            if ($fileSize) {
+                                header('Content-Length: ' . $fileSize);
+                            }
+                            header('Accept-Ranges: bytes');
                             header('Cache-Control: public, max-age=3600');
                             header('Access-Control-Allow-Origin: *');
                             header('Access-Control-Allow-Credentials: true');
                             header('X-Content-Type-Options: nosniff');
-                            echo $content;
-                            flush();
-                            exit;
+                            
+                            $ch = curl_init($downloadUrlWithToken);
+                            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                            curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) {
+                                echo $data;
+                                flush();
+                                return strlen($data);
+                            });
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 1800);
+                            
+                            $success = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $error = curl_error($ch);
+                            curl_close($ch);
+                            
+                            if ($success && $httpCode === 200 && !$error) {
+                                flush();
+                                exit;
+                            } else {
+                                error_log("Erro ao fazer streaming via downloadLink: HTTP {$httpCode}, Erro: {$error}");
+                            }
                         } else {
-                            error_log("Erro ao baixar imagem via downloadLink: HTTP {$httpCode}, Erro: {$error}");
+                            // Para arquivos pequenos, método tradicional
+                            $ch = curl_init($downloadUrlWithToken);
+                            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                            $content = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $error = curl_error($ch);
+                            curl_close($ch);
+                            
+                            if ($httpCode === 200 && $content !== false && !$error && strlen($content) > 0) {
+                                // Limpar qualquer output anterior completamente
+                                while (ob_get_level()) {
+                                    ob_end_clean();
+                                }
+                                
+                                header('Content-Type: ' . ($fileInfo['mimeType'] ?? ($isImage ? 'image/jpeg' : 'video/mp4')));
+                                header('Content-Length: ' . strlen($content));
+                                header('Cache-Control: public, max-age=3600');
+                                header('Access-Control-Allow-Origin: *');
+                                header('Access-Control-Allow-Credentials: true');
+                                header('X-Content-Type-Options: nosniff');
+                                // Para vídeos, permitir range requests (streaming)
+                                if ($isVideo) {
+                                    header('Accept-Ranges: bytes');
+                                }
+                                echo $content;
+                                flush();
+                                exit;
+                            } else {
+                                error_log("Erro ao baixar imagem via downloadLink: HTTP {$httpCode}, Erro: {$error}");
+                            }
                         }
                     }
                     

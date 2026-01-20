@@ -1,0 +1,366 @@
+{
+  "sidebar": {
+    "description": "Configuração completa do sidebar do sistema interno",
+    "version": "1.0.0",
+    "layout": {
+      "type": "fixed",
+      "position": "left",
+      "defaultOpen": true,
+      "collapsible": true,
+      "responsive": {
+        "mobile": {
+          "behavior": "overlay",
+          "overlay": {
+            "enabled": true,
+            "backgroundColor": "black",
+            "opacity": 0.5
+          }
+        },
+        "desktop": {
+          "behavior": "sidebar",
+          "minimizedWidth": "80px",
+          "expandedWidth": "256px"
+        }
+      }
+    },
+    "styling": {
+      "backgroundColor": "black",
+      "textColor": "white",
+      "borderColor": "gray-800",
+      "transition": {
+        "duration": "300ms",
+        "easing": "ease-in-out"
+      },
+      "classes": {
+        "container": "bg-black text-white transition-all duration-300 fixed h-screen z-40 flex flex-col",
+        "expanded": "w-64",
+        "collapsed": "w-20",
+        "mobileHidden": "-translate-x-full md:translate-x-0"
+      }
+    },
+    "header": {
+      "enabled": true,
+      "showLogo": true,
+      "logo": {
+        "path": "/logo.png",
+        "alt": "Logo",
+        "height": "48px",
+        "className": "h-12 w-auto object-contain"
+      },
+      "showTitle": true,
+      "title": "Sistema Interno",
+      "titleStyle": {
+        "className": "text-xs text-gray-400 font-medium text-center"
+      },
+      "toggleButton": {
+        "enabled": true,
+        "icon": {
+          "open": "X",
+          "closed": "Menu"
+        },
+        "size": 20,
+        "className": "p-2 hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
+      },
+      "padding": "p-4",
+      "border": {
+        "enabled": true,
+        "className": "border-b border-gray-800"
+      }
+    },
+    "navigation": {
+      "items": [
+        {
+          "id": "overview",
+          "label": "Visão Geral",
+          "icon": "LayoutDashboard",
+          "iconLibrary": "lucide-react",
+          "permissions": {
+            "roles": ["*"]
+          },
+          "order": 1
+        },
+        {
+          "id": "analytics",
+          "label": "Estatísticas",
+          "icon": "BarChart3",
+          "iconLibrary": "lucide-react",
+          "permissions": {
+            "roles": ["*"]
+          },
+          "order": 2
+        },
+        {
+          "id": "users",
+          "label": "Usuários",
+          "icon": "User",
+          "iconLibrary": "lucide-react",
+          "permissions": {
+            "roles": ["admin", "root"]
+          },
+          "order": 3
+        },
+        {
+          "id": "internal_stats",
+          "label": "Estatísticas Internas",
+          "icon": "Shield",
+          "iconLibrary": "lucide-react",
+          "permissions": {
+            "roles": ["root"]
+          },
+          "order": 4
+        },
+        {
+          "id": "settings",
+          "label": "Configurações",
+          "icon": "Settings",
+          "iconLibrary": "lucide-react",
+          "permissions": {
+            "roles": ["*"]
+          },
+          "order": 5
+        }
+      ],
+      "styling": {
+        "container": "p-4 space-y-2 flex-1 pb-32 overflow-y-auto scrollbar-hide",
+        "item": {
+          "base": "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+          "active": "bg-white text-black",
+          "inactive": "hover:bg-gray-800 text-gray-300"
+        },
+        "icon": {
+          "size": 20
+        },
+        "label": {
+          "className": "font-medium"
+        }
+      },
+      "behavior": {
+        "closeOnMobileClick": true,
+        "mobileBreakpoint": 768
+      }
+    },
+    "footer": {
+      "enabled": true,
+      "showUserInfo": true,
+      "userInfo": {
+        "showName": true,
+        "showEmail": true,
+        "nameStyle": {
+          "className": "text-sm font-semibold"
+        },
+        "emailStyle": {
+          "className": "text-xs text-gray-400"
+        }
+      },
+      "logoutButton": {
+        "enabled": true,
+        "label": "Sair",
+        "icon": "LogOut",
+        "iconLibrary": "lucide-react",
+        "iconSize": 16,
+        "expanded": {
+          "className": "mt-3 w-full flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
+        },
+        "collapsed": {
+          "className": "w-full flex items-center justify-center p-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+        }
+      },
+      "styling": {
+        "container": "p-4 border-t border-gray-800 flex-shrink-0 bg-black",
+        "userCard": "p-4 bg-gray-800 rounded-lg"
+      }
+    }
+  },
+  "mainContent": {
+    "description": "Configuração do conteúdo principal e header",
+    "header": {
+      "enabled": true,
+      "styling": {
+        "container": "bg-white border-b border-gray-200 sticky top-0 z-30",
+        "padding": "px-4 md:px-6 py-3 md:py-4"
+      },
+      "mobileMenuButton": {
+        "enabled": true,
+        "icon": "Menu",
+        "iconLibrary": "lucide-react",
+        "iconSize": 24,
+        "className": "md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+      },
+      "title": {
+        "dynamic": true,
+        "source": "activeTab",
+        "className": "text-xl md:text-2xl font-bold text-black"
+      },
+      "subtitle": {
+        "enabled": true,
+        "template": "Bem-vindo de volta, {userName}",
+        "className": "text-xs md:text-sm text-gray-600 hidden md:block"
+      }
+    },
+    "content": {
+      "styling": {
+        "container": "p-4 md:p-6",
+        "background": "bg-gray-50"
+      },
+      "spacing": {
+        "marginLeft": {
+          "expanded": "md:ml-64",
+          "collapsed": "md:ml-20"
+        }
+      },
+      "transition": {
+        "className": "flex-1 transition-all duration-300 w-full"
+      }
+    }
+  },
+  "loading": {
+    "enabled": true,
+    "spinner": {
+      "type": "dual-ring",
+      "size": "64px",
+      "colors": {
+        "primary": "black",
+        "secondary": "gray-200",
+        "accent": "black/30"
+      },
+      "animation": {
+        "duration": "1s",
+        "reverseDuration": "0.8s"
+      }
+    },
+    "message": {
+      "text": "Carregando dados...",
+      "className": "mt-4 text-gray-600 font-medium"
+    }
+  },
+  "theme": {
+    "colors": {
+      "primary": {
+        "background": "black",
+        "text": "white"
+      },
+      "secondary": {
+        "background": "gray-800",
+        "text": "gray-300"
+      },
+      "accent": {
+        "active": "white",
+        "activeText": "black"
+      },
+      "neutral": {
+        "background": "gray-50",
+        "text": "gray-600",
+        "border": "gray-200"
+      }
+    },
+    "spacing": {
+      "sidebar": {
+        "expanded": "256px",
+        "collapsed": "80px"
+      },
+      "padding": {
+        "small": "p-4",
+        "medium": "p-6",
+        "large": "p-8"
+      }
+    },
+    "typography": {
+      "heading": {
+        "size": "text-xl md:text-2xl",
+        "weight": "font-bold",
+        "color": "text-black"
+      },
+      "body": {
+        "size": "text-sm md:text-base",
+        "color": "text-gray-600"
+      },
+      "label": {
+        "size": "text-xs md:text-sm",
+        "color": "text-gray-400"
+      }
+    }
+  },
+  "permissions": {
+    "description": "Sistema de permissões baseado em roles",
+    "roles": {
+      "root": {
+        "name": "Root",
+        "badge": {
+          "className": "bg-red-100 text-red-700",
+          "label": "Root"
+        },
+        "access": ["overview", "analytics", "users", "internal_stats", "settings"]
+      },
+      "admin": {
+        "name": "Administrador",
+        "badge": {
+          "className": "bg-blue-100 text-blue-700",
+          "label": "Admin"
+        },
+        "access": ["overview", "analytics", "users", "settings"]
+      },
+      "user": {
+        "name": "Usuário",
+        "badge": {
+          "className": "bg-gray-100 text-gray-700",
+          "label": "Usuário"
+        },
+        "access": ["overview", "analytics", "settings"]
+      }
+    },
+    "wildcard": "*",
+    "description": "O wildcard '*' significa acesso para todos os roles"
+  },
+  "breakpoints": {
+    "mobile": {
+      "max": 768,
+      "unit": "px"
+    },
+    "tablet": {
+      "min": 768,
+      "max": 1024,
+      "unit": "px"
+    },
+    "desktop": {
+      "min": 1024,
+      "unit": "px"
+    }
+  },
+  "animations": {
+    "fadeIn": {
+      "name": "fadeIn",
+      "className": "animate-fadeIn"
+    },
+    "sidebar": {
+      "duration": "300ms",
+      "easing": "ease-in-out"
+    }
+  },
+  "implementation": {
+    "notes": [
+      "Este arquivo contém toda a configuração do sidebar e layout do sistema interno",
+      "Os ícones usam a biblioteca lucide-react",
+      "As classes CSS seguem o padrão Tailwind CSS",
+      "O sistema de permissões é baseado em roles (root, admin, user)",
+      "O sidebar é responsivo e se adapta a diferentes tamanhos de tela",
+      "No mobile, o sidebar funciona como overlay",
+      "No desktop, o sidebar pode ser colapsado mantendo-se visível"
+    ],
+    "dependencies": {
+      "react": ">=18.0.0",
+      "lucide-react": ">=0.200.0",
+      "tailwindcss": ">=3.0.0"
+    },
+    "usage": {
+      "description": "Para usar esta configuração em outro projeto:",
+      "steps": [
+        "1. Importe este arquivo JSON no seu projeto",
+        "2. Crie um componente Sidebar que leia esta configuração",
+        "3. Implemente a lógica de permissões baseada em roles",
+        "4. Configure os ícones da biblioteca lucide-react",
+        "5. Aplique as classes Tailwind CSS conforme especificado",
+        "6. Implemente a responsividade conforme os breakpoints definidos"
+      ]
+    }
+  }
+}

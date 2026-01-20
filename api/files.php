@@ -106,6 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
             }
             
+            // Log para debug: quantidade de arquivos encontrados
+            error_log("Arquivos encontrados na pasta '{$driveFolder}': " . count($files) . " arquivos");
+            
             // Limpar qualquer output antes de enviar JSON
             ob_clean();
             
@@ -113,7 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 'files' => $files,
                 'folder' => $folder,
                 'driveFolder' => $driveFolder,
-                'storage' => 'google_drive'
+                'storage' => 'google_drive',
+                'totalFiles' => count($files) // Adicionar contador total para debug
             ]);
         } catch (Exception $e) {
             error_log('Erro ao listar arquivos do Google Drive: ' . $e->getMessage());

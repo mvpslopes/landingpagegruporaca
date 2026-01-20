@@ -309,47 +309,66 @@ class DriveService {
                 throw new Exception('Folder ID não pode ser vazio');
             }
             
-            $results = $this->service->files->listFiles([
-                'q' => $query,
-                'fields' => 'files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink)',
-                'orderBy' => 'modifiedTime desc',
-                'supportsAllDrives' => true,
-                'includeItemsFromAllDrives' => true
-            ]);
-            
-            // Validar resposta
-            if (!$results) {
-                error_log('Aviso: listFiles retornou null ou false');
-                return [];
-            }
-            
             $files = [];
-            $fileList = $results->getFiles();
+            $pageToken = null;
+            $maxResults = 1000; // Máximo de resultados por página (Google Drive permite até 1000)
             
-            // Validar que getFiles retorna um array/iterable
-            if (!is_iterable($fileList)) {
-                error_log('Aviso: getFiles() não retornou um iterable');
-                return [];
-            }
-            
-            foreach ($fileList as $file) {
+            // Loop para buscar todas as páginas de resultados
+            do {
+                $params = [
+                    'q' => $query,
+                    'fields' => 'nextPageToken, files(id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink)',
+                    'orderBy' => 'modifiedTime desc',
+                    'pageSize' => $maxResults,
+                    'supportsAllDrives' => true,
+                    'includeItemsFromAllDrives' => true
+                ];
+                
+                // Adicionar pageToken se houver próxima página
+                if ($pageToken) {
+                    $params['pageToken'] = $pageToken;
+                }
+                
+                $results = $this->service->files->listFiles($params);
+                
+                // Validar resposta
+                if (!$results) {
+                    error_log('Aviso: listFiles retornou null ou false');
+                    break;
+                }
+                
+                $fileList = $results->getFiles();
+                
+                // Validar que getFiles retorna um array/iterable
+                if (!is_iterable($fileList)) {
+                    error_log('Aviso: getFiles() não retornou um iterable');
+                    break;
+                }
+                
+                // Processar arquivos desta página
+                foreach ($fileList as $file) {
                 $isFolder = $file->getMimeType() === 'application/vnd.google-apps.folder';
                 $fileId = $file->getId();
                 $mimeType = $file->getMimeType();
                 
-                // Gerar URL de thumbnail para imagens
+                // Gerar URL de thumbnail para imagens e vídeos
                 $thumbnailUrl = null;
                 $isImage = strpos($mimeType, 'image/') === 0;
-                if ($isImage && !$isFolder) {
+                $isVideo = strpos($mimeType, 'video/') === 0;
+                
+                if (($isImage || $isVideo) && !$isFolder) {
                     // Tentar usar thumbnailLink primeiro (se disponível)
+                    // O Google Drive pode gerar thumbnails para vídeos, mas pode levar tempo para processar
                     $thumbnailLink = method_exists($file, 'getThumbnailLink') ? $file->getThumbnailLink() : null;
                     if ($thumbnailLink) {
                         $thumbnailUrl = $thumbnailLink;
-                    } else {
-                        // Se não tiver thumbnailLink, usar nosso proxy
+                    } else if ($isImage) {
+                        // Para imagens, usar nosso proxy se não tiver thumbnailLink
                         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
                         $thumbnailUrl = $baseUrl . "/api/view-file.php?id={$fileId}";
                     }
+                    // Para vídeos sem thumbnailLink, deixar null (será usado viewLink como fallback)
+                    // O Google Drive pode não ter processado o thumbnail ainda para vídeos grandes
                 }
                 
                 $files[] = [
@@ -364,7 +383,14 @@ class DriveService {
                     'url' => $thumbnailUrl ?: $file->getWebViewLink(), // URL para thumbnail ou viewLink
                     'folder' => $folderPath
                 ];
-            }
+                }
+                
+                // Verificar se há próxima página
+                $pageToken = method_exists($results, 'getNextPageToken') ? $results->getNextPageToken() : null;
+                
+            } while ($pageToken); // Continuar enquanto houver próxima página
+            
+            error_log("Total de arquivos encontrados na pasta '{$folderPath}': " . count($files));
             
             return $files;
         } catch (Exception $e) {
@@ -386,8 +412,14 @@ class DriveService {
             
             // Verificar tipo de arquivo
             $mimeType = mime_content_type($filePath);
-            if (!in_array($mimeType, $this->config['upload']['allowed_types'])) {
-                throw new Exception('Tipo de arquivo não permitido: ' . $mimeType);
+            
+            // Verificar se o tipo está na lista permitida OU se é um tipo de vídeo/imagem genérico
+            $isAllowed = in_array($mimeType, $this->config['upload']['allowed_types']);
+            $isVideo = strpos($mimeType, 'video/') === 0;
+            $isImage = strpos($mimeType, 'image/') === 0;
+            
+            if (!$isAllowed && !$isVideo && !$isImage) {
+                throw new Exception('Tipo de arquivo não permitido: ' . $mimeType . '. Tipos permitidos: imagens, vídeos, PDF e documentos Office.');
             }
             
             // Obter ID da pasta de destino
@@ -439,106 +471,143 @@ class DriveService {
                 throw new Exception('Classe Google_Service_Drive_DriveFile não encontrada.');
             }
             
-            // Upload do arquivo
-            $content = file_get_contents($filePath);
+            // Para arquivos muito grandes (> 500MB), aumentar memory_limit temporariamente
+            // Isso evita erro de memória ao carregar o arquivo
+            $originalMemoryLimit = null;
+            if ($fileSize > 500 * 1024 * 1024) { // > 500MB
+                $originalMemoryLimit = ini_get('memory_limit');
+                // Aumentar para 2.5GB temporariamente (arquivo + overhead)
+                ini_set('memory_limit', '2560M');
+                error_log("Memory limit aumentado temporariamente para 2560M para arquivo de " . round($fileSize / 1024 / 1024, 2) . " MB");
+            }
             
-            // Preparar opções de upload
-            // IMPORTANTE: Sempre usar supportsAllDrives para suportar Shared Drives
-            // e pastas compartilhadas de contas pessoais
-            $uploadOptions = [
-                'data' => $content,
-                'mimeType' => $mimeType,
-                'uploadType' => 'multipart',
-                'fields' => 'id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, owners',
-                'supportsAllDrives' => true
-            ];
-            
-            $file = $this->service->files->create($fileMetadata, $uploadOptions);
-            
-            // CRÍTICO: Se o arquivo foi criado em uma pasta compartilhada de conta pessoal,
-            // ele pode ser propriedade da Service Account, causando erro de quota.
-            // Precisamos transferir a propriedade para o dono da pasta.
-            if ($parentFolder && $parentFolder->getOwners() && count($parentFolder->getOwners()) > 0) {
-                $parentOwner = $parentFolder->getOwners()[0];
-                $parentOwnerEmail = $parentOwner->getEmailAddress();
-                $fileOwners = $file->getOwners();
+            try {
+                // Carregar conteúdo do arquivo
+                $content = file_get_contents($filePath);
                 
-                // Verificar se o arquivo tem dono diferente da pasta
-                $needsTransfer = false;
-                if ($fileOwners && count($fileOwners) > 0) {
-                    $fileOwnerEmail = $fileOwners[0]->getEmailAddress();
-                    $serviceAccountEmail = 'grupo-raca-drive-service@tidal-triumph-481417-g3.iam.gserviceaccount.com';
+                if ($content === false) {
+                    throw new Exception('Erro ao ler arquivo do disco');
+                }
+                
+                // Preparar opções de upload
+                // IMPORTANTE: Sempre usar supportsAllDrives para suportar Shared Drives
+                // e pastas compartilhadas de contas pessoais
+                $uploadOptions = [
+                    'data' => $content,
+                    'mimeType' => $mimeType,
+                    'uploadType' => 'multipart',
+                    'fields' => 'id, name, mimeType, size, modifiedTime, webViewLink, webContentLink, thumbnailLink, owners',
+                    'supportsAllDrives' => true
+                ];
+                
+                $file = $this->service->files->create($fileMetadata, $uploadOptions);
+                
+                // Limpar memória explicitamente
+                unset($content);
+                
+                // CRÍTICO: Se o arquivo foi criado em uma pasta compartilhada de conta pessoal,
+                // ele pode ser propriedade da Service Account, causando erro de quota.
+                // Precisamos transferir a propriedade para o dono da pasta.
+                if ($parentFolder && $parentFolder->getOwners() && count($parentFolder->getOwners()) > 0) {
+                    $parentOwner = $parentFolder->getOwners()[0];
+                    $parentOwnerEmail = $parentOwner->getEmailAddress();
+                    $fileOwners = $file->getOwners();
                     
-                    // Se o arquivo pertence à Service Account, precisa transferir
-                    if (strpos($fileOwnerEmail, $serviceAccountEmail) !== false || 
-                        $fileOwnerEmail !== $parentOwnerEmail) {
-                        $needsTransfer = true;
+                    // Verificar se o arquivo tem dono diferente da pasta
+                    $needsTransfer = false;
+                    if ($fileOwners && count($fileOwners) > 0) {
+                        $fileOwnerEmail = $fileOwners[0]->getEmailAddress();
+                        $serviceAccountEmail = 'grupo-raca-drive-service@tidal-triumph-481417-g3.iam.gserviceaccount.com';
+                        
+                        // Se o arquivo pertence à Service Account, precisa transferir
+                        if (strpos($fileOwnerEmail, $serviceAccountEmail) !== false || 
+                            $fileOwnerEmail !== $parentOwnerEmail) {
+                            $needsTransfer = true;
+                        }
+                    }
+                    
+                    // Tentar transferir propriedade para o dono da pasta
+                    if ($needsTransfer) {
+                        try {
+                            // Criar permissão de proprietário para o dono da pasta
+                            if (class_exists('Google_Service_Drive_Permission')) {
+                                $newPermission = new Google_Service_Drive_Permission();
+                            } elseif (class_exists('Google\Service\Drive\Permission')) {
+                                $newPermission = new \Google\Service\Drive\Permission();
+                            } else {
+                                throw new Exception('Classe Google_Service_Drive_Permission não encontrada.');
+                            }
+                            $newPermission->setType('user');
+                            $newPermission->setRole('owner');
+                            $newPermission->setEmailAddress($parentOwnerEmail);
+                            
+                            // Transferir propriedade
+                            $this->service->permissions->create(
+                                $file->getId(),
+                                $newPermission,
+                                [
+                                    'transferOwnership' => true,
+                                    'supportsAllDrives' => true
+                                ]
+                            );
+                            
+                            error_log("Propriedade do arquivo transferida para: {$parentOwnerEmail}");
+                        } catch (Exception $e) {
+                            // Se não conseguir transferir, logar o erro mas não falhar o upload
+                            error_log("Aviso: Não foi possível transferir propriedade do arquivo: " . $e->getMessage());
+                            error_log("O arquivo pode estar como propriedade da Service Account, o que pode causar problemas de quota.");
+                        }
                     }
                 }
                 
-                // Tentar transferir propriedade para o dono da pasta
-                if ($needsTransfer) {
-                    try {
-                        // Criar permissão de proprietário para o dono da pasta
-                        if (class_exists('Google_Service_Drive_Permission')) {
-                            $newPermission = new Google_Service_Drive_Permission();
-                        } elseif (class_exists('Google\Service\Drive\Permission')) {
-                            $newPermission = new \Google\Service\Drive\Permission();
-                        } else {
-                            throw new Exception('Classe Google_Service_Drive_Permission não encontrada.');
-                        }
-                        $newPermission->setType('user');
-                        $newPermission->setRole('owner');
-                        $newPermission->setEmailAddress($parentOwnerEmail);
-                        
-                        // Transferir propriedade
-                        $this->service->permissions->create(
-                            $file->getId(),
-                            $newPermission,
-                            [
-                                'transferOwnership' => true,
-                                'supportsAllDrives' => true
-                            ]
-                        );
-                        
-                        error_log("Propriedade do arquivo transferida para: {$parentOwnerEmail}");
-                    } catch (Exception $e) {
-                        // Se não conseguir transferir, logar o erro mas não falhar o upload
-                        error_log("Aviso: Não foi possível transferir propriedade do arquivo: " . $e->getMessage());
-                        error_log("O arquivo pode estar como propriedade da Service Account, o que pode causar problemas de quota.");
-                    }
+                // Obter informações do arquivo para retorno
+                $fileId = $file->getId();
+                $fileMimeType = $file->getMimeType();
+                
+                // Gerar URL de thumbnail para imagens e vídeos
+                $thumbnailUrl = null;
+                $isImage = strpos($fileMimeType, 'image/') === 0;
+                $isVideo = strpos($fileMimeType, 'video/') === 0;
+                
+                // Tentar obter thumbnailLink do arquivo recém-uploadado
+                $thumbnailLink = method_exists($file, 'getThumbnailLink') ? $file->getThumbnailLink() : null;
+                
+                if ($thumbnailLink) {
+                    // Se tiver thumbnailLink (pode estar disponível para vídeos já processados)
+                    $thumbnailUrl = $thumbnailLink;
+                } else if ($isImage) {
+                    // Para imagens, usar nosso proxy se não tiver thumbnailLink
+                    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+                    $thumbnailUrl = $baseUrl . "/api/view-file.php?id={$fileId}";
+                }
+                // Para vídeos sem thumbnailLink, deixar null (será usado viewLink como fallback)
+                // O Google Drive pode não ter processado o thumbnail ainda para vídeos grandes/MOV
+                
+                return [
+                    'id' => $fileId,
+                    'name' => $file->getName(),
+                    'type' => 'file',
+                    'mimeType' => $fileMimeType,
+                    'size' => (int)$file->getSize(),
+                    'modifiedTime' => $file->getModifiedTime(),
+                    'viewLink' => $file->getWebViewLink(),
+                    'downloadLink' => $file->getWebContentLink(),
+                    'url' => $thumbnailUrl ?: $file->getWebViewLink(), // URL para thumbnail ou viewLink
+                    'folder' => $folderPath
+                ];
+            } finally {
+                // Restaurar memory_limit original se foi alterado
+                if ($originalMemoryLimit !== null) {
+                    ini_set('memory_limit', $originalMemoryLimit);
+                    error_log("Memory limit restaurado para: " . $originalMemoryLimit);
                 }
             }
-            
-            $fileId = $file->getId();
-            $mimeType = $file->getMimeType();
-            
-            // Gerar URL de thumbnail para imagens
-            $thumbnailUrl = null;
-            $isImage = strpos($mimeType, 'image/') === 0;
-            if ($isImage) {
-                // Usar nosso proxy para garantir que funcione com autenticação
-                $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-                $thumbnailUrl = $baseUrl . "/api/view-file.php?id={$fileId}";
-            }
-            
-            return [
-                'id' => $fileId,
-                'name' => $file->getName(),
-                'type' => 'file',
-                'mimeType' => $mimeType,
-                'size' => (int)$file->getSize(),
-                'modifiedTime' => $file->getModifiedTime(),
-                'viewLink' => $file->getWebViewLink(),
-                'downloadLink' => $file->getWebContentLink(),
-                'url' => $thumbnailUrl ?: $file->getWebViewLink(), // URL para thumbnail ou viewLink
-                'folder' => $folderPath
-            ];
         } catch (Exception $e) {
             error_log('Erro ao fazer upload: ' . $e->getMessage());
             throw new Exception('Erro ao fazer upload: ' . $e->getMessage());
         }
     }
+    
     
     /**
      * Deletar arquivo

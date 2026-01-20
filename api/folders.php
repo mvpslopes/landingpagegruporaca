@@ -64,8 +64,51 @@ try {
     }
 }
 
-// GET: Listar pastas disponíveis
+// GET: Listar pastas disponíveis OU obter ID de pasta específica
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // GET: Obter ID de uma pasta específica (para upload direto)
+    if (isset($_GET['action']) && $_GET['action'] === 'getFolderId' && isset($_GET['path'])) {
+        $folderPath = $_GET['path'];
+        
+        try {
+            if ($folderPath === '*') {
+                jsonResponse([
+                    'folderId' => $driveService->getRootFolderId(),
+                    'path' => '*'
+                ]);
+            }
+            
+            // Se o caminho não contém '/', buscar pasta diretamente na raiz
+            if (strpos($folderPath, '/') === false) {
+                $folderId = $driveService->getFolderIdByName($folderPath, $driveService->getRootFolderId());
+                if ($folderId) {
+                    jsonResponse([
+                        'folderId' => $folderId,
+                        'path' => $folderPath
+                    ]);
+                } else {
+                    // Se não encontrar, retornar raiz
+                    jsonResponse([
+                        'folderId' => $driveService->getRootFolderId(),
+                        'path' => '*',
+                        'warning' => "Pasta '{$folderPath}' não encontrada, usando raiz"
+                    ]);
+                }
+            } else {
+                // Se contém '/', usar ensureFolder para buscar/criar estrutura
+                $folderId = $driveService->ensureFolder($folderPath);
+                jsonResponse([
+                    'folderId' => $folderId,
+                    'path' => $folderPath
+                ]);
+            }
+        } catch (Exception $e) {
+            error_log('Erro ao obter ID da pasta: ' . $e->getMessage());
+            jsonError('Erro ao obter ID da pasta: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    // GET: Listar pastas disponíveis
     try {
         $folders = [];
         

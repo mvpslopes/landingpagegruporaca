@@ -73,6 +73,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
         
         $conn = getDBConnection();
         if ($conn) {
+            // Primeiro, encerrar qualquer sessão antiga do mesmo usuário que ainda esteja aberta
+            $stmt = $conn->prepare("
+                UPDATE internal_sessions 
+                SET logout_time = NOW(),
+                    session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                WHERE user_id = ? AND logout_time IS NULL
+            ");
+            $stmt->execute([$user['id']]);
+            
+            // Agora criar nova sessão
             $stmt = $conn->prepare("
                 INSERT INTO internal_sessions 
                 (user_id, email, name, role, ip_address, user_agent, login_time)
@@ -105,33 +115,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
 
 // Rota: POST /api/auth.php?action=logout
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'logout') {
+    $userId = null;
+    $sessionId = null;
+    
     if (isset($_SESSION['user'])) {
+        $userId = $_SESSION['user']['id'];
+        $sessionId = $_SESSION['internal_session_id'] ?? null;
+        
         try {
-            logAudit($_SESSION['user']['id'], 'logout', null, null, []);
+            logAudit($userId, 'logout', null, null, []);
         } catch (Exception $e) {
             error_log("Erro no log de auditoria: " . $e->getMessage());
         }
-        
-        // Atualizar sessão interna com logout_time e calcular duração
-        if (isset($_SESSION['internal_session_id'])) {
-            try {
-                require_once 'db_config.php';
-                $conn = getDBConnection();
-                if ($conn) {
+    }
+    
+    // Sempre tentar encerrar a sessão no banco, mesmo se a sessão PHP já foi destruída
+    if ($sessionId || $userId) {
+        try {
+            require_once 'db_config.php';
+            $conn = getDBConnection();
+            if ($conn) {
+                if ($sessionId) {
+                    // Tentar encerrar sessão específica
                     $stmt = $conn->prepare("
                         UPDATE internal_sessions 
                         SET logout_time = NOW(),
                             session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
-                        WHERE id = ?
+                        WHERE id = ? AND logout_time IS NULL
                     ");
-                    $stmt->execute([$_SESSION['internal_session_id']]);
+                    $stmt->execute([$sessionId]);
+                } else if ($userId) {
+                    // Se não tiver session_id mas tiver user_id, encerrar todas as sessões abertas do usuário
+                    $stmt = $conn->prepare("
+                        UPDATE internal_sessions 
+                        SET logout_time = NOW(),
+                            session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
+                        WHERE user_id = ? AND logout_time IS NULL
+                    ");
+                    $stmt->execute([$userId]);
                 }
-            } catch (Exception $e) {
-                error_log("Erro ao atualizar sessão interna: " . $e->getMessage());
             }
+        } catch (Exception $e) {
+            error_log("Erro ao atualizar sessão interna: " . $e->getMessage());
         }
     }
-    session_destroy();
+    
+    // Sempre destruir a sessão PHP, mesmo se não houver usuário na sessão
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+    
     jsonResponse(['success' => true, 'message' => 'Logout realizado com sucesso']);
 }
 

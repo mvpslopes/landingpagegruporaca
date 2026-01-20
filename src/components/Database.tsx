@@ -49,6 +49,7 @@ export default function DatabasePage() {
   const [renameValue, setRenameValue] = useState('');
   const [showMoveModal, setShowMoveModal] = useState<{ file: FileItem } | null>(null);
   const [loadingFolder, setLoadingFolder] = useState<string | null>(null);
+  const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   
   // Função helper para adicionar toast
   const addToast = useCallback((message: string, type: Toast['type'] = 'info', duration?: number) => {
@@ -69,23 +70,32 @@ export default function DatabasePage() {
       (file.tags && file.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))))
     );
   }, [files, searchTerm]);
+
+  // Função para obter lista de mídias (imagens e vídeos) filtradas
+  const getMediaFiles = useCallback(() => {
+    return files.filter(file => 
+      ((file as any).mimeType?.startsWith('image/') || (file as any).mimeType?.startsWith('video/')) &&
+      (file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (file.tags && file.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))))
+    );
+  }, [files, searchTerm]);
   
-  // Função para navegar entre imagens
+  // Função para navegar entre imagens e vídeos
   const navigateImage = useCallback((direction: 'prev' | 'next') => {
-    const imageFiles = getImageFiles();
-    if (imageFiles.length === 0 || !previewFile) return;
+    const mediaFiles = getMediaFiles();
+    if (mediaFiles.length === 0 || !previewFile) return;
     
-    const currentIndex = imageFiles.findIndex(f => f.id === previewFile.id);
+    const currentIndex = mediaFiles.findIndex(f => f.id === previewFile.id);
     if (currentIndex === -1) return;
     
     let newIndex: number;
     if (direction === 'next') {
-      newIndex = (currentIndex + 1) % imageFiles.length;
+      newIndex = (currentIndex + 1) % mediaFiles.length;
     } else {
-      newIndex = currentIndex === 0 ? imageFiles.length - 1 : currentIndex - 1;
+      newIndex = currentIndex === 0 ? mediaFiles.length - 1 : currentIndex - 1;
     }
     
-    const newFile = imageFiles[newIndex];
+    const newFile = mediaFiles[newIndex];
     if (newFile) {
       // Limpar blob URL anterior
       if (previewImageBlobUrl) {
@@ -96,7 +106,7 @@ export default function DatabasePage() {
       setPreviewImageLoading(true);
       setPreviewFile(newFile);
     }
-  }, [previewFile, getImageFiles, previewImageBlobUrl]);
+  }, [previewFile, getMediaFiles, previewImageBlobUrl]);
   
   // Adicionar listeners de teclado para navegação e atalhos
   useEffect(() => {
@@ -194,9 +204,9 @@ export default function DatabasePage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [previewFile, navigateImage, previewImageBlobUrl, showUploadModal, showCreateFolderModal, showDeleteConfirm, showRenameModal, showMoveModal, selectedFiles, files, user]);
 
-  // Carregar imagem usando fetch com credentials quando previewFile mudar
+  // Carregar imagem ou vídeo usando fetch com credentials quando previewFile mudar
   useEffect(() => {
-    if (!previewFile || !previewFile.mimeType?.startsWith('image/')) {
+    if (!previewFile || (!previewFile.mimeType?.startsWith('image/') && !previewFile.mimeType?.startsWith('video/'))) {
       return;
     }
 
@@ -209,9 +219,15 @@ export default function DatabasePage() {
     setPreviewImageLoading(true);
     setPreviewImageError(false);
 
-    const loadImage = async () => {
+    const loadFile = async () => {
       try {
-        const response = await fetch(`/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`, {
+        const isImage = previewFile.mimeType?.startsWith('image/');
+        const isVideo = previewFile.mimeType?.startsWith('video/');
+        
+        // Para imagens e vídeos, usar view-file.php (agora suporta ambos)
+        const endpoint = `/api/view-file.php?id=${previewFile.id}&t=${Date.now()}`;
+        
+        const response = await fetch(endpoint, {
           credentials: 'include'
         });
 
@@ -223,18 +239,20 @@ export default function DatabasePage() {
           } catch {
             // Não é JSON
           }
-          console.error('Erro ao carregar imagem:', response.status, errorData || errorText);
+          console.error(`Erro ao carregar ${isImage ? 'imagem' : 'vídeo'}:`, response.status, errorData || errorText);
           setPreviewImageLoading(false);
           setPreviewImageError(true);
           return;
         }
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.startsWith('image/')) {
-          console.error('Resposta não é uma imagem:', contentType);
-          setPreviewImageLoading(false);
-          setPreviewImageError(true);
-          return;
+        if (isImage) {
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.startsWith('image/')) {
+            console.error('Resposta não é uma imagem:', contentType);
+            setPreviewImageLoading(false);
+            setPreviewImageError(true);
+            return;
+          }
         }
 
         // Criar blob URL
@@ -244,13 +262,13 @@ export default function DatabasePage() {
         setPreviewImageLoading(false);
         setPreviewImageError(false);
       } catch (error) {
-        console.error('Erro ao carregar imagem:', error);
+        console.error(`Erro ao carregar ${previewFile.mimeType?.startsWith('image/') ? 'imagem' : 'vídeo'}:`, error);
         setPreviewImageLoading(false);
         setPreviewImageError(true);
       }
     };
 
-    loadImage();
+    loadFile();
 
     // Cleanup: revogar blob URL quando componente desmontar ou previewFile mudar
     return () => {
@@ -355,6 +373,40 @@ export default function DatabasePage() {
       window.removeEventListener('touchstart', resetActivity);
     };
   }, [isAuthenticated, user, lastActivity]);
+
+  // Fazer logout quando a página for fechada
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const handleBeforeUnload = () => {
+      // Tentar fazer logout usando sendBeacon (mais confiável para beforeunload)
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      try {
+        if (navigator.sendBeacon) {
+          // sendBeacon funciona melhor com FormData ou Blob simples
+          const formData = new FormData();
+          formData.append('action', 'logout');
+          navigator.sendBeacon(`${apiUrl}/auth.php?action=logout`, formData);
+        } else {
+          // Fallback: tentar fazer logout via XHR síncrono (pode não funcionar em beforeunload)
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${apiUrl}/auth.php?action=logout`, false);
+          xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+          xhr.send('action=logout');
+        }
+      } catch (err) {
+        console.error('Erro ao fazer logout ao fechar página:', err);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+    };
+  }, [isAuthenticated, user]);
 
   const checkAuth = async () => {
     setLoading(true);
@@ -524,6 +576,15 @@ export default function DatabasePage() {
         
         setShowLogin(false);
         await loadFiles();
+        
+        // Mostrar aviso sobre logout após login bem-sucedido
+        // Verificar se o usuário já optou por não mostrar novamente
+        const dontShowAgain = localStorage.getItem('database_logout_warning_dismissed');
+        if (!dontShowAgain) {
+          setTimeout(() => {
+            setShowLogoutWarning(true);
+          }, 500); // Pequeno delay para não sobrepor a animação de login
+        }
       } else {
         setLoginError(response.error || 'Email ou senha incorretos');
         setLoading(false);
@@ -597,42 +658,108 @@ export default function DatabasePage() {
       
       console.log('Upload - Pasta selecionada:', folder, 'CurrentFolder:', currentFolder, 'User folder:', user.folder);
 
-      // Upload de cada arquivo com progresso
-      const uploadPromises = uploadFiles.map(async (file) => {
+      // Validar tamanho dos arquivos antes de começar
+      const maxSize = 1024 * 1024 * 1024; // 1GB
+      const oversizedFiles = uploadFiles.filter(f => f.size > maxSize);
+      if (oversizedFiles.length > 0) {
+        const fileNames = oversizedFiles.map(f => f.name).join(', ');
+        setError(`Arquivo(s) muito grande(s): ${fileNames}. Tamanho máximo: 1GB por arquivo.`);
+        setLoading(false);
+        return;
+      }
+
+      // Upload direto para Google Drive (todos os tamanhos)
+      // O arquivo vai direto do navegador para Google Drive, sem passar pelo servidor
+      let successCount = 0;
+      let errorCountLocal = 0;
+
+      for (const file of uploadFiles) {
         const fileName = file.name;
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        console.log(`📁 Preparando upload direto: ${fileName} (${fileSizeMB} MB)`);
         setUploadProgress(prev => ({ ...prev, [fileName]: 0 }));
-        
+
         try {
-          const response = await api.uploadFile(file, folder);
-          
+          // Upload direto para Google Drive
+          const response = await api.uploadFileDirectToDrive(
+            file,
+            folder,
+            (progress) => {
+              // Atualizar progresso em tempo real
+              setUploadProgress(prev => ({ ...prev, [fileName]: progress }));
+            }
+          );
+
           if (response.error) {
             setUploadProgress(prev => ({ ...prev, [fileName]: -1 })); // -1 = erro
-            throw new Error(response.error);
+            errorCountLocal += 1;
+            console.error(`❌ Erro ao enviar ${fileName}:`, response.error);
+            
+            // Se erro for de autenticação, mostrar mensagem específica
+            if (response.error.includes('não autenticado') || response.error.includes('autorizar')) {
+              setError('Por favor, autorize o Google Drive primeiro. O sistema tentará autorizar automaticamente na próxima tentativa.');
+            }
+          } else {
+            setUploadProgress(prev => ({ ...prev, [fileName]: 100 }));
+            successCount += 1;
+            console.log(`✅ Upload direto concluído: ${fileName}`);
           }
-          
-          setUploadProgress(prev => ({ ...prev, [fileName]: 100 }));
-          return response;
         } catch (err: any) {
           setUploadProgress(prev => ({ ...prev, [fileName]: -1 }));
-          throw err;
+          errorCountLocal += 1;
+          console.error(`❌ Exceção ao enviar ${fileName}:`, err?.message || err);
+          
+          // Se erro for de autenticação, mostrar mensagem específica
+          if (err?.message?.includes('não autenticado') || err?.message?.includes('autorizar')) {
+            setError('Por favor, autorize o Google Drive primeiro. O sistema tentará autorizar automaticamente na próxima tentativa.');
+          }
         }
-      });
-
-      await Promise.all(uploadPromises);
+      }
 
       // Limpar e recarregar
-      const successCount = uploadFiles.length;
       setUploadFiles([]);
       setUploadProgress({});
       setShowUploadModal(false);
-      addToast(`${successCount} arquivo(s) enviado(s) com sucesso`, 'success');
+      if (successCount > 0) {
+        addToast(`${successCount} arquivo(s) enviado(s) com sucesso`, 'success');
+      }
+      if (errorCountLocal > 0) {
+        addToast(`${errorCountLocal} arquivo(s) falharam no upload`, 'error', 6000);
+      }
       await loadFiles(); // Recarregar lista
     } catch (err: any) {
       const errorCount = Object.values(uploadProgress).filter(p => p === -1).length;
       if (errorCount > 0) {
-        addToast(`${errorCount} arquivo(s) falharam no upload`, 'error', 5000);
+        // Verificar se é erro 413
+        const is413Error = err.message && err.message.includes('ERRO 413');
+        if (is413Error) {
+          // Mostrar mensagem detalhada para erro 413
+          addToast(
+            'Servidor rejeitando upload: arquivo muito grande. Verifique as configurações do servidor.',
+            'error',
+            10000 // 10 segundos para dar tempo de ler
+          );
+          setError(
+            'O servidor está rejeitando o upload porque o arquivo é muito grande. ' +
+            'O limite configurado no servidor precisa ser ajustado. ' +
+            'Entre em contato com o administrador do servidor ou consulte o arquivo "api/RESOLVER_ERRO_413.md" para instruções.'
+          );
+        } else {
+          addToast(`${errorCount} arquivo(s) falharam no upload`, 'error', 5000);
+        }
       } else {
-        addToast(err.message || 'Erro ao fazer upload', 'error');
+        // Verificar se é erro 413 na mensagem
+        const is413Error = err.message && err.message.includes('ERRO 413');
+        if (is413Error) {
+          addToast(
+            'Servidor rejeitando upload: arquivo muito grande. Verifique as configurações do servidor.',
+            'error',
+            10000
+          );
+          setError(err.message);
+        } else {
+          addToast(err.message || 'Erro ao fazer upload', 'error', 5000);
+        }
       }
     } finally {
       setLoading(false);
@@ -958,18 +1085,20 @@ export default function DatabasePage() {
           </div>
         </div>
       )}
-      <div className={`min-h-screen bg-gray-50 transition-opacity duration-300 ${isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+      <div className={`min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 transition-opacity duration-300 ${isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
+      {/* Header Moderno com Glassmorphism */}
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 md:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
-              <div className="w-9 h-9 md:w-10 md:h-10 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-black via-gray-800 to-black rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ring-2 ring-black/10">
                 <Database size={20} className="md:w-6 md:h-6 text-white" />
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-base md:text-xl font-bold text-black truncate">Banco de Dados de Fotos</h1>
-                <p className="text-sm text-gray-600">Gerencie e organize os arquivos</p>
+                <h1 className="text-base md:text-xl font-bold bg-gradient-to-r from-black via-gray-800 to-black bg-clip-text text-transparent truncate">
+                  Banco de Dados de Fotos
+                </h1>
+                <p className="text-xs md:text-sm text-gray-500 font-medium">Gerencie e organize os arquivos</p>
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
@@ -1006,7 +1135,7 @@ export default function DatabasePage() {
                       }
                       setSelectedFiles(new Set());
                     }}
-                    className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-green-600 text-white hover:bg-green-700 active:bg-green-800 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
+                    className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 active:scale-95 rounded-xl transition-all duration-300 text-xs md:text-sm font-semibold touch-manipulation min-h-[44px] shadow-lg hover:shadow-xl"
                   >
                     <Download size={16} />
                     <span className="hidden sm:inline">Baixar ({selectedFiles.size})</span>
@@ -1014,7 +1143,7 @@ export default function DatabasePage() {
                   </button>
                   <button
                     onClick={() => setSelectedFiles(new Set())}
-                    className="px-3 md:px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
+                    className="px-3 md:px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:from-gray-200 hover:to-gray-300 active:scale-95 rounded-xl transition-all duration-300 text-xs md:text-sm font-semibold touch-manipulation min-h-[44px] shadow-md hover:shadow-lg border border-gray-300/50"
                   >
                     <span className="hidden sm:inline">Limpar</span>
                     <span className="sm:hidden">X</span>
@@ -1033,7 +1162,7 @@ export default function DatabasePage() {
               {canManageUsers && (
                 <button
                   onClick={() => setShowUserManagement(true)}
-                  className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors text-xs md:text-sm font-medium touch-manipulation min-h-[44px]"
+                  className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 active:scale-95 rounded-xl transition-all duration-300 text-xs md:text-sm font-semibold touch-manipulation min-h-[44px] shadow-lg hover:shadow-xl"
                 >
                   <Users size={14} className="md:w-4 md:h-4" />
                   <span className="hidden md:inline">Gerenciar Usuários</span>
@@ -1043,7 +1172,7 @@ export default function DatabasePage() {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition-colors text-xs md:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px]"
+                className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 active:scale-95 rounded-xl transition-all duration-300 text-xs md:text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px] border border-gray-200/50 shadow-sm hover:shadow-md"
               >
                 {isLoggingOut ? (
                   <>
@@ -1064,8 +1193,8 @@ export default function DatabasePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 md:py-8">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-4 md:p-6 border-b border-gray-200">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 overflow-hidden backdrop-blur-sm">
+          <div className="p-4 md:p-6 border-b border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-xl md:text-2xl font-bold text-black">Galeria de Arquivos</h2>
@@ -1078,7 +1207,7 @@ export default function DatabasePage() {
                   <>
                     <button 
                       onClick={() => setShowCreateFolderModal(true)}
-                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
+                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 rounded-xl transition-all duration-300 text-sm font-semibold touch-manipulation min-h-[44px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
                       title="Criar subpasta"
                     >
                       <FolderPlus size={18} />
@@ -1087,7 +1216,7 @@ export default function DatabasePage() {
                     </button>
                     <button 
                       onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
+                      className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-2 bg-gradient-to-r from-black to-gray-800 text-white hover:from-gray-800 hover:to-black rounded-xl transition-all duration-300 text-sm font-semibold touch-manipulation min-h-[44px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
                     >
                       <Upload size={18} />
                       <span className="hidden sm:inline">Upload Arquivos</span>
@@ -1099,7 +1228,7 @@ export default function DatabasePage() {
             </div>
             
             {/* Breadcrumb da Pasta Atual */}
-            <div className="flex items-center gap-2 md:gap-3 p-2 md:p-3 bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-2 md:gap-3 p-2 md:p-3 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl border border-gray-200/50 overflow-x-auto scrollbar-hide shadow-inner">
               <div className="flex items-center gap-2 md:gap-3 min-w-max">
                 {(() => {
                   // Mostrar botão "Voltar" se não estiver na pasta raiz/base
@@ -1110,7 +1239,7 @@ export default function DatabasePage() {
                   return canGoBack ? (
                     <button
                       onClick={goBackFolder}
-                      className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors text-xs md:text-sm font-medium text-gray-700 touch-manipulation min-h-[36px] flex-shrink-0"
+                      className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-white border border-gray-300/80 rounded-xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-white active:scale-95 transition-all duration-300 text-xs md:text-sm font-semibold text-gray-700 touch-manipulation min-h-[36px] flex-shrink-0 shadow-sm hover:shadow-md"
                       title="Voltar para pasta anterior"
                     >
                       <ArrowLeft size={14} className="md:w-4 md:h-4" />
@@ -1135,10 +1264,10 @@ export default function DatabasePage() {
                           <span key={part.path} className="flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={() => setCurrentFolder(part.path)}
-                              className={`text-xs md:text-sm font-semibold px-2 md:px-2.5 py-1 md:py-1.5 rounded transition-colors uppercase touch-manipulation min-h-[32px] ${
+                              className={`text-xs md:text-sm font-semibold px-2 md:px-2.5 py-1 md:py-1.5 rounded-xl transition-all duration-300 uppercase touch-manipulation min-h-[32px] ${
                                 index === array.length - 1
-                                  ? 'text-black bg-white border border-gray-300 cursor-default'
-                                  : 'text-gray-600 hover:text-black hover:bg-gray-100 active:bg-gray-200'
+                                  ? 'text-black bg-gradient-to-r from-white to-gray-50 border-2 border-gray-300 cursor-default shadow-sm'
+                                  : 'text-gray-600 hover:text-black hover:bg-gradient-to-r hover:from-gray-100 hover:to-gray-50 active:scale-95 border border-gray-300/50 shadow-sm hover:shadow-md'
                               }`}
                             >
                               {part.name}
@@ -1154,7 +1283,7 @@ export default function DatabasePage() {
                   
                   // Mostrar apenas o caminho atual se não houver navegação (apenas para USER na pasta base)
                   return (
-                    <span className="text-xs md:text-sm font-semibold text-black bg-white px-2.5 md:px-3 py-1 md:py-1.5 rounded border border-gray-300 uppercase flex-shrink-0">
+                    <span className="text-xs md:text-sm font-semibold text-black bg-gradient-to-r from-white to-gray-50 px-2.5 md:px-3 py-1 md:py-1.5 rounded-xl border border-gray-300/80 uppercase flex-shrink-0 shadow-sm">
                       {getCurrentFolderPath()}
                     </span>
                   );
@@ -1184,7 +1313,7 @@ export default function DatabasePage() {
                       console.log('Pasta alterada para:', e.target.value);
                       setCurrentFolder(e.target.value);
                     }}
-                    className="w-full md:w-auto px-4 py-3 md:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white text-base md:text-sm touch-manipulation min-h-[44px]"
+                    className="w-full md:w-auto px-4 py-3 md:py-2 border-2 border-gray-300/80 rounded-xl focus:ring-2 focus:ring-black focus:border-black outline-none bg-gradient-to-r from-white to-gray-50 text-base md:text-sm touch-manipulation min-h-[44px] shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                   >
                     {folders.length > 0 ? (
                       folders.map((folder) => (
@@ -1218,14 +1347,17 @@ export default function DatabasePage() {
                   placeholder="Buscar por animal, raça ou tags..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 md:py-2 text-base md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none touch-manipulation min-h-[44px]"
+                  className="w-full pl-10 pr-4 py-3 md:py-2 text-base md:text-sm border-2 border-gray-300/80 rounded-xl focus:ring-2 focus:ring-black focus:border-black outline-none touch-manipulation min-h-[44px] bg-gradient-to-r from-white to-gray-50/50 shadow-sm hover:shadow-md focus:shadow-lg transition-all duration-300 font-medium"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                {error}
+              <div className="mb-4 bg-gradient-to-r from-red-50 to-red-100/50 border-2 border-red-300/80 text-red-700 px-4 py-3 rounded-xl shadow-md">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={18} className="text-red-600" />
+                  <span className="font-semibold">{error}</span>
+                </div>
               </div>
             )}
 
@@ -1237,7 +1369,7 @@ export default function DatabasePage() {
                 <select
                   value={fileTypeFilter}
                   onChange={(e) => setFileTypeFilter(e.target.value)}
-                  className="px-3 py-2.5 md:py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none text-base md:text-sm touch-manipulation min-h-[44px]"
+                  className="px-3 py-2.5 md:py-1.5 border-2 border-gray-300/80 rounded-xl focus:ring-2 focus:ring-black focus:border-black outline-none text-base md:text-sm touch-manipulation min-h-[44px] bg-gradient-to-r from-white to-gray-50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                 >
                   <option value="all">Todos</option>
                   <option value="image">Imagens</option>
@@ -1486,23 +1618,31 @@ export default function DatabasePage() {
                     );
                   }
                   
-                  // Card de Arquivo - Design original
+                  // Card de Arquivo - Design Moderno
                   const isSelected = selectedFiles.has(file.id);
                   return (
                     <div 
                       key={file.id} 
-                      className={`group bg-white border-2 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer ${
-                        isSelected ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200 hover:border-black'
+                      className={`group bg-white border-2 rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer transform hover:scale-[1.02] hover:-translate-y-1 ${
+                        isSelected 
+                          ? 'border-blue-500 ring-4 ring-blue-200 shadow-2xl shadow-blue-500/20' 
+                          : 'border-gray-200/80 hover:border-gray-300 hover:shadow-2xl shadow-lg'
                       }`}
                       onClick={(e) => {
-                        // Se clicar no checkbox, não abrir modal
-                        if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
+                        // Se clicar no checkbox, botão ou link, não abrir modal
+                        if (
+                          (e.target as HTMLElement).closest('input[type="checkbox"]') ||
+                          (e.target as HTMLElement).closest('button') ||
+                          (e.target as HTMLElement).closest('a')
+                        ) {
                           return;
                         }
                         
-                        // Se for imagem, abrir modal de visualização
                         const isImage = (file as any).mimeType?.startsWith('image/');
-                        if (isImage && file.url) {
+                        const isVideo = (file as any).mimeType?.startsWith('video/');
+                        
+                        // Se for imagem ou vídeo, abrir modal de visualização
+                        if ((isImage || isVideo) && file.url) {
                           // Limpar blob URL anterior se existir
                           if (previewImageBlobUrl) {
                             window.URL.revokeObjectURL(previewImageBlobUrl);
@@ -1514,7 +1654,7 @@ export default function DatabasePage() {
                         }
                       }}
                     >
-                      <div className="relative aspect-square overflow-hidden bg-gray-100">
+                      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
                         {/* Checkbox para seleção múltipla */}
                         <div className="absolute top-2 left-2 z-10">
                           <input
@@ -1534,45 +1674,127 @@ export default function DatabasePage() {
                             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </div>
-                        {file.url && (file as any).mimeType?.startsWith('image/') ? (
-                          <img 
-                            src={file.url} 
-                            alt={file.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            onError={(e) => {
-                              // Se falhar, tentar usar viewLink ou downloadLink
-                              const target = e.target as HTMLImageElement;
-                              const fallbackUrl = (file as any).downloadLink || (file as any).viewLink;
-                              if (fallbackUrl && target.src !== fallbackUrl) {
-                                console.error('Erro ao carregar miniatura, tentando fallback:', fallbackUrl);
-                                target.src = fallbackUrl;
-                              } else {
-                                console.error('Erro ao carregar miniatura e nenhum fallback disponível', {
-                                  id: file.id,
-                                  url: file.url,
-                                  downloadLink: (file as any).downloadLink,
-                                  viewLink: (file as any).viewLink
-                                });
-                                // Mostrar placeholder de erro
-                                target.style.display = 'none';
-                                const parent = target.parentElement;
-                                if (parent && !parent.querySelector('.error-placeholder')) {
-                                  const placeholder = document.createElement('div');
-                                  placeholder.className = 'error-placeholder w-full h-full flex items-center justify-center bg-gray-200 text-gray-400';
-                                  placeholder.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
-                                  parent.appendChild(placeholder);
-                                }
-                              }
-                            }}
-                            onLoad={() => {
-                              console.log('Miniatura carregada com sucesso');
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon size={48} className="text-gray-400" />
-                          </div>
-                        )}
+                        {(() => {
+                          const isImage = (file as any).mimeType?.startsWith('image/');
+                          const isVideo = (file as any).mimeType?.startsWith('video/');
+                          // Verificar se tem thumbnail: 
+                          // - Para imagens: sempre tentar exibir (pode ser thumbnailLink ou nosso proxy)
+                          // - Para vídeos: verificar se a URL é um thumbnailLink (googleusercontent.com) ou nosso proxy
+                          // - Não exibir se for um viewLink do Google Drive
+                          const isViewLink = file.url && (
+                            file.url.includes('drive.google.com/file/d/') || 
+                            file.url.includes('drive.google.com/open')
+                          );
+                          const hasThumbnail = file.url && (
+                            (isImage && !isViewLink) || 
+                            (isVideo && !isViewLink && (
+                              file.url.includes('googleusercontent.com') || 
+                              file.url.includes('/api/view-file.php')
+                            ))
+                          );
+                          
+                          if (hasThumbnail) {
+                            const isImage = (file as any).mimeType?.startsWith('image/');
+                            const isVideo = (file as any).mimeType?.startsWith('video/');
+                            return (
+                              <img 
+                                src={file.url} 
+                                alt={file.name}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isImage && file.url) {
+                                    // Limpar blob URL anterior se existir
+                                    if (previewImageBlobUrl) {
+                                      window.URL.revokeObjectURL(previewImageBlobUrl);
+                                      setPreviewImageBlobUrl(null);
+                                    }
+                                    setPreviewImageError(false);
+                                    setPreviewImageLoading(true);
+                                    setPreviewFile(file);
+                                  } else if (isVideo && file.url) {
+                                    // Limpar blob URL anterior se existir
+                                    if (previewImageBlobUrl) {
+                                      window.URL.revokeObjectURL(previewImageBlobUrl);
+                                      setPreviewImageBlobUrl(null);
+                                    }
+                                    setPreviewImageError(false);
+                                    setPreviewImageLoading(true);
+                                    setPreviewFile(file);
+                                  }
+                                }}
+                                onError={(e) => {
+                                  // Se falhar, tentar usar viewLink ou downloadLink
+                                  const target = e.target as HTMLImageElement;
+                                  const fallbackUrl = (file as any).downloadLink || (file as any).viewLink;
+                                  if (fallbackUrl && target.src !== fallbackUrl) {
+                                    console.error('Erro ao carregar miniatura, tentando fallback:', fallbackUrl);
+                                    target.src = fallbackUrl;
+                                  } else {
+                                    console.error('Erro ao carregar miniatura e nenhum fallback disponível', {
+                                      id: file.id,
+                                      url: file.url,
+                                      downloadLink: (file as any).downloadLink,
+                                      viewLink: (file as any).viewLink
+                                    });
+                                    // Mostrar placeholder de erro
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent && !parent.querySelector('.error-placeholder')) {
+                                      const placeholder = document.createElement('div');
+                                      placeholder.className = 'error-placeholder w-full h-full flex items-center justify-center bg-gray-200 text-gray-400';
+                                      placeholder.innerHTML = '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+                                      parent.appendChild(placeholder);
+                                    }
+                                  }
+                                }}
+                                onLoad={() => {
+                                  console.log('Miniatura carregada com sucesso');
+                                }}
+                              />
+                            );
+                          } else if (isVideo) {
+                            // Para vídeos sem thumbnail, mostrar ícone de vídeo com mensagem de processamento
+                            return (
+                              <div 
+                                className="w-full h-full flex flex-col items-center justify-center bg-gray-100 relative cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (file.url) {
+                                    // Limpar blob URL anterior se existir
+                                    if (previewImageBlobUrl) {
+                                      window.URL.revokeObjectURL(previewImageBlobUrl);
+                                      setPreviewImageBlobUrl(null);
+                                    }
+                                    setPreviewImageError(false);
+                                    setPreviewImageLoading(true);
+                                    setPreviewFile(file);
+                                  }
+                                }}
+                              >
+                                <Video size={48} className="text-gray-400 mb-3" />
+                                <span className="text-xs text-gray-500 text-center px-2 line-clamp-2 mb-2">
+                                  {file.name}
+                                </span>
+                                <div className="px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg max-w-[90%]">
+                                  <p className="text-xs text-yellow-700 font-medium text-center">
+                                    Arquivo sendo processado
+                                  </p>
+                                  <p className="text-xs text-yellow-600 text-center mt-0.5">
+                                    O thumbnail aparecerá em breve
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // Para outros tipos de arquivo, mostrar ícone genérico
+                            return (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon size={48} className="text-gray-400" />
+                              </div>
+                            );
+                          }
+                        })()}
                         <div className="absolute top-2 right-2 opacity-0 md:group-hover:opacity-100 transition-opacity md:opacity-0">
                           <div className="flex gap-2">
                             {file.url && (
@@ -1580,6 +1802,7 @@ export default function DatabasePage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const isImage = (file as any).mimeType?.startsWith('image/');
+                                  const isVideo = (file as any).mimeType?.startsWith('video/');
                                   if (isImage) {
                                     // Limpar blob URL anterior se existir
                                     if (previewImageBlobUrl) {
@@ -1589,9 +1812,15 @@ export default function DatabasePage() {
                                     setPreviewImageError(false);
                                     setPreviewImageLoading(true);
                                     setPreviewFile(file);
-                                  } else {
-                                    // Se não for imagem, abrir em nova aba
-                                    window.open(file.url, '_blank', 'noopener,noreferrer');
+                                  } else if (isVideo && file.url) {
+                                    // Limpar blob URL anterior se existir
+                                    if (previewImageBlobUrl) {
+                                      window.URL.revokeObjectURL(previewImageBlobUrl);
+                                      setPreviewImageBlobUrl(null);
+                                    }
+                                    setPreviewImageError(false);
+                                    setPreviewImageLoading(true);
+                                    setPreviewFile(file);
                                   }
                                 }}
                                 className="p-2.5 md:p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -1710,22 +1939,56 @@ export default function DatabasePage() {
                           </div>
                         </div>
                       </div>
-                      <div className="p-4">
-                        <h3 className="font-bold text-black mb-1 truncate">{file.name}</h3>
+                      <div className="p-4 bg-gradient-to-b from-white to-gray-50/50">
+                        <h3 className="font-bold text-gray-900 mb-2 truncate text-sm group-hover:text-black transition-colors">{file.name}</h3>
                         {file.tags && file.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-2">
+                          <div className="flex flex-wrap gap-1.5 mb-3">
                             {file.tags.map((tag: string, idx: number) => (
-                              <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded">
+                              <span key={idx} className="px-2.5 py-1 bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 text-xs rounded-full font-medium border border-gray-200/50">
                                 {tag}
                               </span>
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{file.size}</span>
-                          <span>{new Date(file.uploaded_at).toLocaleDateString('pt-BR')}</span>
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                          <span className="font-medium">{file.size}</span>
+                          <span className="font-medium">{new Date(file.uploaded_at).toLocaleDateString('pt-BR')}</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Por: {file.uploaded_by}</p>
+                        <p className="text-xs text-gray-400 font-medium">Por: {file.uploaded_by}</p>
+                        {/* Botão de download sempre visível na parte inferior para vídeos */}
+                        {(file as any).mimeType?.startsWith('video/') && file.url && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              try {
+                                const response = await fetch(`/api/download-file.php?id=${file.id}`, {
+                                  credentials: 'include'
+                                });
+                                if (response.ok) {
+                                  const blob = await response.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = file.name;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  window.URL.revokeObjectURL(url);
+                                } else {
+                                  console.error('Erro ao fazer download');
+                                }
+                              } catch (error) {
+                                console.error('Erro ao fazer download:', error);
+                              }
+                            }}
+                            className="w-full mt-3 px-4 py-2.5 bg-gradient-to-r from-black to-gray-800 text-white text-sm font-semibold rounded-xl hover:from-gray-800 hover:to-black transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+                            title="Baixar vídeo"
+                          >
+                            <Download size={16} />
+                            Baixar Vídeo
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1864,8 +2127,15 @@ export default function DatabasePage() {
                                   setPreviewImageError(false);
                                   setPreviewImageLoading(true);
                                   setPreviewFile(file);
-                                } else {
-                                  window.open(file.url, '_blank', 'noopener,noreferrer');
+                                } else if ((file as any).mimeType?.startsWith('video/') && file.url) {
+                                  // Limpar blob URL anterior se existir
+                                  if (previewImageBlobUrl) {
+                                    window.URL.revokeObjectURL(previewImageBlobUrl);
+                                    setPreviewImageBlobUrl(null);
+                                  }
+                                  setPreviewImageError(false);
+                                  setPreviewImageLoading(true);
+                                  setPreviewFile(file);
                                 }
                               }}
                               className="p-2.5 md:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
@@ -2047,7 +2317,7 @@ export default function DatabasePage() {
                 type="file" 
                 name="files" 
                 multiple 
-                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" 
+                accept="image/*,video/*,.mp4,.mov,.avi,.wmv,.webm,.mkv,.mpeg,.mpg,.pdf,.doc,.docx,.xls,.xlsx" 
                 className="hidden" 
                 id="file-upload"
                 onChange={(e) => handleFileSelect(e.target.files)}
@@ -2058,7 +2328,7 @@ export default function DatabasePage() {
                   {isDragging ? 'Solte os arquivos aqui' : 'Clique para selecionar arquivos'}
                 </p>
                 <p className="text-sm text-gray-500 mb-3">ou arraste e solte aqui</p>
-                <p className="text-xs text-gray-400">Formatos: Imagens, Vídeos, PDF, Documentos (máx. 100MB por arquivo)</p>
+                <p className="text-xs text-gray-400">Formatos: Imagens, Vídeos, PDF, Documentos (máx. 1GB por arquivo)</p>
               </label>
             </div>
             
@@ -2092,12 +2362,24 @@ export default function DatabasePage() {
                                 <span className="text-red-500 text-xs font-medium">Erro</span>
                               ) : isComplete ? (
                                 <CheckCircle className="text-green-500" size={20} />
+                              ) : progress === 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <Loader2 className="animate-spin text-blue-600" size={16} />
+                                  <span className="text-xs text-gray-600 font-medium">
+                                    Preparando...
+                                  </span>
+                                </div>
                               ) : (
-                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-blue-600 transition-all duration-300"
-                                    style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                                  />
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-blue-600 transition-all duration-300"
+                                      style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-gray-600 font-medium min-w-[3rem] text-right">
+                                    {progress}%
+                                  </span>
                                 </div>
                               )}
                             </>
@@ -2123,8 +2405,32 @@ export default function DatabasePage() {
           </div>
           
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-              {error}
+            <div className={`p-4 rounded-lg border-2 ${
+              error.includes('ERRO 413') || error.includes('rejeitando')
+                ? 'bg-red-100 border-red-400 text-red-800'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertCircle className="flex-shrink-0 mt-0.5" size={20} />
+                <div className="flex-1">
+                  <p className="font-semibold mb-1">
+                    {error.includes('ERRO 413') || error.includes('rejeitando')
+                      ? '⚠️ Servidor Rejeitando Upload'
+                      : 'Erro no Upload'}
+                  </p>
+                  <p className="text-sm leading-relaxed">{error}</p>
+                  {(error.includes('ERRO 413') || error.includes('rejeitando')) && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded text-yellow-800 text-xs">
+                      <p className="font-semibold mb-1">💡 Solução:</p>
+                      <p>
+                        O servidor precisa ter suas configurações ajustadas para aceitar arquivos grandes. 
+                        Entre em contato com o administrador do servidor ou consulte o arquivo 
+                        <strong> "api/RESOLVER_ERRO_413.md"</strong> para instruções detalhadas de como configurar.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           
@@ -2191,7 +2497,7 @@ export default function DatabasePage() {
             </button>
             
             {/* Setas de Navegação */}
-            {getImageFiles().length > 1 && (
+            {getMediaFiles().length > 1 && (
               <>
                 <button
                   onClick={(e) => {
@@ -2199,7 +2505,7 @@ export default function DatabasePage() {
                     navigateImage('prev');
                   }}
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/70 hover:bg-black/90 text-white rounded-full transition-colors backdrop-blur-sm"
-                  aria-label="Imagem anterior"
+                  aria-label={previewFile.mimeType?.startsWith('video/') ? 'Vídeo anterior' : 'Imagem anterior'}
                 >
                   <ArrowLeft size={24} />
                 </button>
@@ -2209,14 +2515,14 @@ export default function DatabasePage() {
                     navigateImage('next');
                   }}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 p-3 bg-black/70 hover:bg-black/90 text-white rounded-full transition-colors backdrop-blur-sm"
-                  aria-label="Próxima imagem"
+                  aria-label={previewFile.mimeType?.startsWith('video/') ? 'Próximo vídeo' : 'Próxima imagem'}
                 >
                   <ArrowRight size={24} />
                 </button>
               </>
             )}
             
-            {/* Imagem */}
+            {/* Imagem ou Vídeo */}
             <div className="relative w-full h-full flex items-center justify-center">
               {previewFile.mimeType?.startsWith('image/') ? (
                 <>
@@ -2287,9 +2593,81 @@ export default function DatabasePage() {
                     </div>
                   )}
                 </>
+              ) : previewFile.mimeType?.startsWith('video/') ? (
+                <>
+                  {previewImageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                  {previewImageError ? (
+                    <div className="text-white text-center p-8">
+                      <p className="text-lg mb-2">Erro ao carregar vídeo</p>
+                      <p className="text-sm opacity-75 mb-4">{previewFile.name}</p>
+                      <button
+                        onClick={async () => {
+                          setPreviewImageError(false);
+                          setPreviewImageLoading(true);
+                          // Recarregar vídeo usando fetch
+                          try {
+                            const response = await fetch(`/api/download-file.php?id=${previewFile.id}&t=${Date.now()}`, {
+                              credentials: 'include'
+                            });
+                            if (response.ok) {
+                              const blob = await response.blob();
+                              const blobUrl = window.URL.createObjectURL(blob);
+                              // Limpar blob URL anterior se existir
+                              if (previewImageBlobUrl) {
+                                window.URL.revokeObjectURL(previewImageBlobUrl);
+                              }
+                              setPreviewImageBlobUrl(blobUrl);
+                              setPreviewImageError(false);
+                              setPreviewImageLoading(false);
+                            } else {
+                              setPreviewImageError(true);
+                              setPreviewImageLoading(false);
+                            }
+                          } catch (error) {
+                            console.error('Erro ao recarregar vídeo:', error);
+                            setPreviewImageError(true);
+                            setPreviewImageLoading(false);
+                          }
+                        }}
+                        className="px-4 py-2 bg-white text-black rounded hover:bg-gray-100 transition-colors text-sm"
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  ) : previewImageBlobUrl ? (
+                    <video 
+                      key={previewFile.id}
+                      src={previewImageBlobUrl}
+                      controls
+                      autoPlay
+                      className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+                      onError={() => {
+                        console.error('Erro ao exibir vídeo do blob URL');
+                        setPreviewImageError(true);
+                        setPreviewImageLoading(false);
+                      }}
+                      onLoadedData={() => {
+                        console.log('Vídeo carregado com sucesso no modal');
+                        setPreviewImageLoading(false);
+                        setPreviewImageError(false);
+                      }}
+                      style={{ display: previewImageLoading ? 'none' : 'block' }}
+                    >
+                      Seu navegador não suporta a tag de vídeo.
+                    </video>
+                  ) : (
+                    <div className="text-white text-center p-8">
+                      <p className="text-lg mb-2">Carregando vídeo...</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-white text-center p-8">
-                  <p className="text-lg mb-2">Arquivo não é uma imagem</p>
+                  <p className="text-lg mb-2">Tipo de arquivo não suportado</p>
                   <p className="text-sm opacity-75">{previewFile.name}</p>
                 </div>
               )}
@@ -2311,8 +2689,8 @@ export default function DatabasePage() {
                       {(previewFile as any).modifiedTime && (
                         <span>{new Date((previewFile as any).modifiedTime).toLocaleDateString('pt-BR')}</span>
                       )}
-                      {getImageFiles().length > 1 && (
-                        <span>{getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}</span>
+                      {getMediaFiles().length > 1 && (
+                        <span>{getMediaFiles().findIndex(f => f.id === previewFile.id) + 1} de {getMediaFiles().length}</span>
                       )}
                     </div>
                   </div>
@@ -2369,9 +2747,9 @@ export default function DatabasePage() {
             </div>
             
             {/* Contador de Imagens */}
-            {getImageFiles().length > 1 && previewFile.mimeType?.startsWith('image/') && (
+            {getMediaFiles().length > 1 && (
               <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-black/70 text-white rounded-full backdrop-blur-sm text-sm">
-                {getImageFiles().findIndex(f => f.id === previewFile.id) + 1} de {getImageFiles().length}
+                {getMediaFiles().findIndex(f => f.id === previewFile.id) + 1} de {getMediaFiles().length}
               </div>
             )}
           </div>
@@ -2542,6 +2920,64 @@ export default function DatabasePage() {
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {/* Modal de Aviso sobre Logout */}
+      {showLogoutWarning && (
+        <Modal
+          isOpen={showLogoutWarning}
+          onClose={() => setShowLogoutWarning(false)}
+          title="⚠️ Aviso Importante"
+        >
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-6 w-6 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-semibold text-yellow-800 mb-2">
+                    Como sair do sistema corretamente
+                  </h3>
+                  <p className="text-sm text-yellow-700 mb-3">
+                    Para evitar problemas de autenticação, <strong>sempre use o botão "Sair"</strong> quando quiser encerrar sua sessão.
+                  </p>
+                  <div className="bg-white rounded p-3 mb-3">
+                    <p className="text-xs text-gray-600 font-medium mb-1">✅ Faça assim:</p>
+                    <p className="text-xs text-gray-700">Clique no botão <strong>"Sair"</strong> localizado no menu lateral ou no rodapé do sistema.</p>
+                  </div>
+                  <div className="bg-white rounded p-3">
+                    <p className="text-xs text-red-600 font-medium mb-1">❌ Evite fazer:</p>
+                    <p className="text-xs text-gray-700">Fechar a janela do navegador ou a aba sem clicar no botão "Sair". Isso pode causar problemas de autenticação na próxima vez que você acessar o sistema.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="dontShowAgain"
+                className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    localStorage.setItem('database_logout_warning_dismissed', 'true');
+                  }
+                }}
+              />
+              <label htmlFor="dontShowAgain" className="ml-2 text-sm text-gray-700">
+                Não mostrar esta mensagem novamente
+              </label>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowLogoutWarning(false)}
+                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal de Confirmação de Delete */}
       {showDeleteConfirm && (

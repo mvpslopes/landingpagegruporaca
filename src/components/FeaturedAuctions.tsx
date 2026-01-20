@@ -27,11 +27,20 @@ const auctions = [
     image: '/leiloes/L02.jpeg'
   },
   {
+    id: 9,
+    title: '1º Leilão Matrizes Haras 2ª Geração',
+    date: '14 de janeiro a 14 de fevereiro',
+    startDate: createDate(2026, 1, 14),
+    endDate: createDate(2026, 2, 14),
+    breed: 'Mangalarga Marchador',
+    image: '/leiloes/L09.jpeg'
+  },
+  {
     id: 3,
     title: 'Leilão Genética Campeã Haras Pardal',
-    date: '19 a 24 de janeiro',
-    startDate: createDate(2026, 1, 19),
-    endDate: createDate(2026, 1, 24),
+    date: '26 a 31 de janeiro',
+    startDate: createDate(2026, 1, 26),
+    endDate: createDate(2026, 1, 31),
     breed: 'Mangalarga Marchador',
     image: '/leiloes/L03.jpeg'
   },
@@ -79,15 +88,6 @@ const auctions = [
     endDate: createDate(2026, 7, 4),
     breed: 'Campolina Marchador',
     image: '/leiloes/L08.jpeg'
-  },
-  {
-    id: 9,
-    title: '1º Leilão Matrizes Haras 2ª Geração',
-    date: '14 de janeiro a 14 de fevereiro',
-    startDate: createDate(2026, 1, 14),
-    endDate: createDate(2026, 2, 14),
-    breed: 'Mangalarga Marchador',
-    image: '/leiloes/L09.jpeg'
   }
 ];
 

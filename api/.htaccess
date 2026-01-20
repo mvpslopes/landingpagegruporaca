@@ -3,6 +3,20 @@
     Require all granted
 </IfModule>
 
+# Configurações para upload de arquivos grandes (até 1GB)
+# Nota: Estas configurações podem não funcionar em todos os servidores
+# Se não funcionarem, configure diretamente no php.ini
+<IfModule mod_php.c>
+    php_value upload_max_filesize 1024M
+    php_value post_max_size 1024M
+    php_value max_execution_time 3600
+    php_value max_input_time 3600
+    php_value memory_limit 512M
+</IfModule>
+
+# Limite do Apache para corpo da requisição (1GB = 1073741824 bytes)
+LimitRequestBody 1073741824
+
 # Permitir apenas arquivos PHP
 <FilesMatch "\.(json|txt|log)$">
     Require all denied
