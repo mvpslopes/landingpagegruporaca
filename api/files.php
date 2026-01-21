@@ -106,6 +106,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
             }
             
+            // Para ASSESSORES, filtrar arquivos de pastas vinculadas a usuários (role=user)
+            if ($user['role'] === 'assessor') {
+                $filteredFiles = [];
+                foreach ($files as $file) {
+                    // Determinar a pasta do arquivo
+                    $fileFolder = $file['folder'] ?? '';
+                    
+                    // Se estamos na raiz (driveFolder === '*'), o campo folder contém o nome da pasta
+                    if ($driveFolder === '*') {
+                        // Para pastas na raiz, folder é o nome da pasta
+                        // Para arquivos na raiz, folder é o nome da pasta onde está
+                        $folderName = $fileFolder;
+                        if (empty($folderName) && isset($file['name'])) {
+                            // Se folder está vazio, pode ser que seja uma pasta na raiz
+                            $folderName = $file['name'];
+                        }
+                        
+                        // Verificar se a pasta está vinculada a um usuário
+                        if (!empty($folderName) && !isFolderLinkedToUser($folderName)) {
+                            $filteredFiles[] = $file;
+                        }
+                    } else {
+                        // Em uma pasta específica: verificar se a pasta pai está vinculada a usuário
+                        $parentFolder = $fileFolder;
+                        // Se folder contém '/', extrair a primeira parte (pasta raiz)
+                        if (strpos($parentFolder, '/') !== false) {
+                            $parentFolder = explode('/', $parentFolder)[0];
+                        }
+                        
+                        // Se a pasta pai não está vinculada a usuário, incluir
+                        if (empty($parentFolder) || !isFolderLinkedToUser($parentFolder)) {
+                            $filteredFiles[] = $file;
+                        }
+                    }
+                }
+                $files = $filteredFiles;
+            }
+            
             // Log para debug: quantidade de arquivos encontrados
             error_log("Arquivos encontrados na pasta '{$driveFolder}': " . count($files) . " arquivos");
             
@@ -379,6 +417,24 @@ function convertUserFolderToDrivePath($user, $folder) {
             return '*'; // Pasta raiz (GRUPO_RACA)
         }
         return $folder; // Usar o caminho diretamente
+    }
+    
+    // Se for ASSESSOR, pode acessar pastas da raiz (exceto pastas de usuários)
+    if ($user['role'] === 'assessor') {
+        if ($folder === '*') {
+            return '*'; // Pasta raiz
+        }
+        
+        $userFolder = strtoupper(trim($user['folder'] ?? ''));
+        $normalizedFolder = strtoupper(trim($folder));
+        
+        // Se for a própria pasta ASSESSORES
+        if ($normalizedFolder === 'ASSESSORES' || $normalizedFolder === $userFolder) {
+            return $userFolder;
+        }
+        
+        // Para outras pastas, usar diretamente (já validadas em canAccessFolder)
+        return $folder;
     }
     
     // Se for USER, usar apenas sua pasta

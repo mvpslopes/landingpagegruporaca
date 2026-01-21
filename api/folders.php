@@ -112,8 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $folders = [];
         
-        // Se for ROOT, ADMIN ou VIEWER, listar todas as pastas da raiz do Google Drive
-        if ($user['role'] === 'root' || $user['role'] === 'admin' || $user['role'] === 'viewer') {
+        // Se for ROOT, ADMIN, VIEWER ou ASSESSOR, listar pastas da raiz do Google Drive
+        if ($user['role'] === 'root' || $user['role'] === 'admin' || $user['role'] === 'viewer' || $user['role'] === 'assessor') {
             // Adicionar opção "Todas" primeiro
             $folders[] = [
                 'id' => '*',
@@ -136,6 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                             // Normalizar para maiúsculas para consistência
                             $folderName = strtoupper(trim($folderName));
                             if (!empty($folderName) && $folderName !== '*' && !in_array($folderName, $folderNames)) {
+                                // Se for ASSESSOR, filtrar pastas vinculadas a usuários (role=user)
+                                if ($user['role'] === 'assessor' && isFolderLinkedToUser($folderName)) {
+                                    continue; // Pular pastas de usuários
+                                }
                                 $folderNames[] = $folderName;
                             }
                         }
@@ -149,6 +153,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         'name' => $folderName,
                         'path' => $folderName
                     ];
+                }
+                
+                // Se for ASSESSOR, garantir que a pasta ASSESSORES esteja na lista
+                if ($user['role'] === 'assessor') {
+                    $assessoresFolder = strtoupper(trim($user['folder'] ?? 'ASSESSORES'));
+                    if (!empty($assessoresFolder) && $assessoresFolder !== '*') {
+                        // Verificar se ASSESSORES já está na lista
+                        $assessoresExists = false;
+                        foreach ($folders as $folder) {
+                            if (strtoupper(trim($folder['path'] ?? '')) === $assessoresFolder) {
+                                $assessoresExists = true;
+                                break;
+                            }
+                        }
+                        
+                        // Se não existe, adicionar
+                        if (!$assessoresExists) {
+                            $folders[] = [
+                                'id' => $assessoresFolder,
+                                'name' => $assessoresFolder,
+                                'path' => $assessoresFolder
+                            ];
+                        }
+                    }
                 }
                 
                 // Ordenar por nome (mantendo "Todas" no início)

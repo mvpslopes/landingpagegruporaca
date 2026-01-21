@@ -337,11 +337,11 @@ export default function DatabasePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFolder]);
 
-  // Inatividade: deslogar após 5 minutos sem interação
+  // Inatividade: deslogar após 2 horas sem interação (aumentado para uploads grandes)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutos
+    const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas (para permitir uploads grandes sem expirar sessão)
 
     const resetActivity = () => {
       setLastActivity(Date.now());
@@ -477,8 +477,10 @@ export default function DatabasePage() {
         api.getFolders().then((foldersResponse) => {
           console.log('✅ Resposta completa de pastas:', JSON.stringify(foldersResponse, null, 2));
           
-          if (foldersResponse.folders && Array.isArray(foldersResponse.folders) && foldersResponse.folders.length > 0) {
-            const folderNames = foldersResponse.folders.map(f => {
+          // Acessar folders através da propriedade correta do ApiResponse
+          const foldersList = (foldersResponse as any).folders || [];
+          if (Array.isArray(foldersList) && foldersList.length > 0) {
+            const folderNames = foldersList.map((f: any) => {
               const path = f.path || f.name || f.id;
               console.log('Processando pasta:', f, '→ path:', path);
               return path;
@@ -507,6 +509,8 @@ export default function DatabasePage() {
       
       if (response.files) {
         console.log('loadFiles: atualizando lista de arquivos, total:', response.files.length);
+        // Limpar qualquer erro pendente ao carregar arquivos com sucesso
+        setError('');
         setFiles(response.files);
 
         // Se for USER, garantir que só veja arquivos de sua pasta
@@ -536,6 +540,12 @@ export default function DatabasePage() {
         }
       } else if (response.error) {
         setError(response.error);
+        // Se for erro de acesso à pasta, limpar mensagem depois de alguns segundos
+        if (response.error.includes('Sem acesso a esta pasta')) {
+          setTimeout(() => {
+            setError('');
+          }, 5000); // 5 segundos
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar arquivos');
@@ -3027,7 +3037,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
     email: '',
     password: '',
     name: '',
-    role: 'user' as 'root' | 'admin' | 'viewer' | 'user',
+    role: 'user' as 'root' | 'admin' | 'viewer' | 'user' | 'assessor',
     folder: ''
   });
 
@@ -3078,7 +3088,7 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
       email: userToEdit.email,
       password: '', // Não preencher senha
       name: userToEdit.name,
-      role: userToEdit.role,
+      role: userToEdit.role as 'root' | 'admin' | 'viewer' | 'user' | 'assessor',
       folder: userToEdit.folder || ''
     });
     setShowCreateForm(false);
@@ -3196,10 +3206,11 @@ function UserManagementModal({ onClose, user }: { onClose: () => void; user: Use
               <label className="block text-sm font-semibold text-gray-700 mb-1">Nível</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'root' | 'admin' | 'viewer' | 'user' })}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'root' | 'admin' | 'viewer' | 'user' | 'assessor' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
               >
                 <option value="user">USER</option>
+                <option value="assessor">ASSESSOR</option>
                 <option value="viewer">VIEWER</option>
                 <option value="admin">ADMIN</option>
                 <option value="root">ROOT</option>

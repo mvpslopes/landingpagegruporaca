@@ -8,7 +8,7 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: 'root' | 'admin' | 'viewer' | 'user';
+  role: 'root' | 'admin' | 'viewer' | 'user' | 'assessor';
   folder: string;
   permissions: {
     upload: boolean;
@@ -32,6 +32,7 @@ interface FileItem {
   mimeType?: string;
   downloadLink?: string;
   viewLink?: string;
+  type?: 'file' | 'folder';
 }
 
 interface ApiResponse<T> {
@@ -174,7 +175,7 @@ export async function updateUser(userId: number, userData: {
   name?: string;
   email?: string;
   password?: string;
-  role?: 'root' | 'admin' | 'viewer' | 'user';
+  role?: 'root' | 'admin' | 'viewer' | 'user' | 'assessor';
   folder?: string;
 }): Promise<ApiResponse<User>> {
   try {

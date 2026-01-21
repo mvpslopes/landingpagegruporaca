@@ -102,6 +102,47 @@ function hasPermission($user, $action, $folder = null) {
         return true;
     }
     
+    // ASSESSOR - lógica especial
+    if ($role === 'assessor') {
+        // Assessor nunca pode deletar
+        if ($action === 'delete') {
+            return false;
+        }
+        
+        // Assessor não pode gerenciar usuários
+        if ($action === 'manage_users' || $action === 'manage_permissions') {
+            return false;
+        }
+        
+        $userFolder = strtoupper(trim($user['folder'] ?? ''));
+        $normalizedFolder = $folder ? strtoupper(trim($folder)) : null;
+        
+        // Se for a própria pasta ASSESSORES
+        if ($normalizedFolder === 'ASSESSORES' || $normalizedFolder === $userFolder) {
+            // Na própria pasta: pode fazer upload e baixar, mas não deletar
+            if ($action === 'upload' || $action === 'download' || $action === 'view_all') {
+                return true;
+            }
+            return false;
+        }
+        
+        // Se for uma pasta vinculada a um usuário (role=user), não tem acesso
+        if ($normalizedFolder && isFolderLinkedToUser($normalizedFolder)) {
+            return false;
+        }
+        
+        // Para outras pastas da raiz: pode visualizar e baixar, mas NÃO fazer upload
+        if ($action === 'download' || $action === 'view_all') {
+            return true;
+        }
+        
+        if ($action === 'upload') {
+            return false; // Não pode fazer upload em outras pastas
+        }
+        
+        return false;
+    }
+    
     // VIEWER - pode ver todas as pastas, baixar, fazer upload, mas não pode deletar nem gerenciar
     if ($role === 'viewer') {
         // VIEWER não pode deletar
@@ -164,6 +205,30 @@ function canAccessFolder($user, $folder) {
     
     // ROOT, ADMIN e VIEWER acessam todas as pastas
     if ($role === 'root' || $role === 'admin' || $role === 'viewer') {
+        return true;
+    }
+    
+    // ASSESSOR - pode acessar todas as pastas, exceto pastas vinculadas a usuários (role=user)
+    if ($role === 'assessor') {
+        // Se for a própria pasta ASSESSORES, pode acessar
+        $normalizedFolder = $folder ? strtoupper(trim($folder)) : '*';
+        $normalizedUserFolder = strtoupper(trim($userFolder));
+        
+        if ($normalizedFolder === 'ASSESSORES' || $normalizedFolder === $normalizedUserFolder) {
+            return true;
+        }
+        
+        // Se for pasta raiz, pode acessar
+        if ($normalizedFolder === '*') {
+            return true;
+        }
+        
+        // Se for uma pasta vinculada a um usuário (role=user), não pode acessar
+        if (isFolderLinkedToUser($normalizedFolder)) {
+            return false;
+        }
+        
+        // Para outras pastas da raiz, pode acessar (visualizar/baixar)
         return true;
     }
     

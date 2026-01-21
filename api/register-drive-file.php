@@ -65,6 +65,24 @@ try {
             return $folder;
         }
         
+        // Se for ASSESSOR, pode acessar pastas da raiz (exceto pastas de usuários)
+        if ($user['role'] === 'assessor') {
+            if ($folder === '*') {
+                return '*'; // Pasta raiz
+            }
+            
+            $userFolder = strtoupper(trim($user['folder'] ?? ''));
+            $normalizedFolder = strtoupper(trim($folder));
+            
+            // Se for a própria pasta ASSESSORES
+            if ($normalizedFolder === 'ASSESSORES' || $normalizedFolder === $userFolder) {
+                return $userFolder;
+            }
+            
+            // Para outras pastas, usar diretamente (já validadas em canAccessFolder)
+            return $folder;
+        }
+        
         if ($user['role'] === 'user') {
             $userFolder = $user['folder'] ?? '*';
             if ($userFolder === '*') {
