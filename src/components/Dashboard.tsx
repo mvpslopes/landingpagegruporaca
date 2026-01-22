@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   LogOut, Users, 
   LayoutDashboard, Settings, BarChart3,
-  Menu, X, User as UserIcon, Shield
+  Menu, X, User as UserIcon, Shield, Gavel
 } from 'lucide-react';
 import * as api from '../lib/api';
 import Analytics from './Analytics';
 import InternalUsersStats from './InternalUsersStats';
+import AuctionsManagement from './AuctionsManagement';
 import { useInactivity } from '../hooks/useInactivity';
 
 interface DashboardProps {
@@ -14,7 +15,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type TabType = 'overview' | 'analytics' | 'users' | 'internal_stats' | 'settings';
+type TabType = 'overview' | 'analytics' | 'users' | 'internal_stats' | 'settings' | 'auctions';
 
 export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [loading, setLoading] = useState(false);
@@ -111,6 +112,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     { id: 'analytics', label: 'Estatísticas', icon: BarChart3 },
     ...(user.role === 'admin' || user.role === 'root' 
       ? [{ id: 'users', label: 'Usuários', icon: UserIcon }]
+      : []),
+    ...(user.role === 'admin' || user.role === 'root' 
+      ? [{ id: 'auctions', label: 'Cadastro de Leilões', icon: Gavel }]
       : []),
     ...(user.role === 'root' 
       ? [{ id: 'internal_stats', label: 'Estatísticas Internas', icon: Shield }]
@@ -369,6 +373,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                     )}
                   </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'auctions' && (user.role === 'admin' || user.role === 'root') && (
+                <div className="animate-fadeIn">
+                  <AuctionsManagement 
+                    user={user}
+                    useModal={false}
+                  />
                 </div>
               )}
 

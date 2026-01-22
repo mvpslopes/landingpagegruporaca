@@ -836,5 +836,122 @@ export async function getStatistics(action: string, period: string = '7d'): Prom
   }
 }
 
-export type { User, FileItem, ApiResponse, Folder };
+/**
+ * Leilões
+ */
+export interface Auction {
+  id: number;
+  title: string;
+  breed: string;
+  start_date: string;
+  end_date: string;
+  image_path?: string;
+  image_drive_id?: string;
+  active: boolean;
+  status?: 'EM_BREVE' | 'NO_AR' | 'ENCERRADO';
+  date_display?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getAuctions(): Promise<ApiResponse<Auction[]>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auctions.php`, {
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao listar leilões');
+    }
+
+    return { data: data.auctions || [] };
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao listar leilões' };
+  }
+}
+
+export async function createAuction(auctionData: {
+  title: string;
+  breed: string;
+  start_date: string;
+  end_date: string;
+  image_path?: string;
+  image_drive_id?: string;
+  active?: boolean;
+}): Promise<ApiResponse<Auction>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auctions.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(auctionData),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao criar leilão');
+    }
+
+    return { data: data.auction };
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao criar leilão' };
+  }
+}
+
+export async function updateAuction(auctionId: number, auctionData: {
+  title?: string;
+  breed?: string;
+  start_date?: string;
+  end_date?: string;
+  image_path?: string;
+  image_drive_id?: string;
+  active?: boolean;
+}): Promise<ApiResponse<Auction>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auctions.php`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ id: auctionId, ...auctionData }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao atualizar leilão');
+    }
+
+    return { data: data.auction };
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao atualizar leilão' };
+  }
+}
+
+export async function deleteAuction(auctionId: number): Promise<ApiResponse<null>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auctions.php?id=${auctionId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao deletar leilão');
+    }
+
+    return data;
+  } catch (error: any) {
+    return { error: error.message || 'Erro ao deletar leilão' };
+  }
+}
+
+export type { User, FileItem, ApiResponse, Folder, Auction };
 

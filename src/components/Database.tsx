@@ -2236,6 +2236,8 @@ export default function DatabasePage() {
         </div>
       </main>
 
+      {/* Modal de Gerenciamento de Leilões (ROOT/ADMIN) */}
+
       {/* Modal de Gerenciamento de Usuários (ROOT) */}
       {showUserManagement && canManageUsers && (
         <UserManagementModal 
