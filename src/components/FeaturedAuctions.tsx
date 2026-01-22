@@ -25,12 +25,35 @@ export default function FeaturedAuctions() {
   
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cardsRevealed, setCardsRevealed] = useState(false);
+
+  // Fallback: garantir que os cards apareçam mesmo se o scroll reveal não funcionar
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCardsRevealed(true);
+    }, 500); // Após 500ms, forçar revelação dos cards
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     // Buscar leilões do banco de dados
     const fetchAuctions = async () => {
       try {
-        const response = await fetch('/api/get-auctions-public.php');
+        // Usar URL absoluta para evitar problemas no mobile
+        const apiUrl = window.location.origin + '/api/get-auctions-public.php';
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
         
         if (data.auctions && Array.isArray(data.auctions)) {
@@ -57,6 +80,9 @@ export default function FeaturedAuctions() {
           });
           
           setAuctions(formattedAuctions);
+        } else {
+          console.warn('Resposta da API não contém array de leilões:', data);
+          setAuctions([]);
         }
       } catch (error) {
         console.error('Erro ao carregar leilões:', error);
@@ -92,7 +118,7 @@ export default function FeaturedAuctions() {
 
         <div 
           ref={cardsRef}
-          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 scroll-reveal scroll-reveal-up ${cardsVisible ? 'revealed' : ''}`}
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 ${(cardsVisible || cardsRevealed || (!loading && auctions.length > 0)) ? 'scroll-reveal scroll-reveal-up revealed' : ''}`}
         >
           {loading ? (
             <div className="col-span-full text-center py-12">

@@ -1788,10 +1788,10 @@ export default function DatabasePage() {
                                 </span>
                                 <div className="px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg max-w-[90%]">
                                   <p className="text-xs text-yellow-700 font-medium text-center">
-                                    Arquivo sendo processado
+                                    Arquivo enviado com sucesso
                                   </p>
                                   <p className="text-xs text-yellow-600 text-center mt-0.5">
-                                    O thumbnail aparecerá em breve
+                                    a imagem do vídeo aparecerá em breve
                                   </p>
                                 </div>
                               </div>
