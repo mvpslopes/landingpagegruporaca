@@ -4,8 +4,8 @@
  * Faz upload direto do navegador para Google Drive sem passar pelo servidor
  */
 
-// Configuração do OAuth (vem do backend)
-const GOOGLE_CLIENT_ID = 'REDACTED-CLIENT-ID.apps.googleusercontent.com';
+// OAuth Client ID (público no front — definir em .env: VITE_GOOGLE_CLIENT_ID)
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file';
 
 // Cache do token de acesso

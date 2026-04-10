@@ -1,34 +1,28 @@
 <?php
 /**
  * Configuração Google Drive - Grupo Raça
- * 
- * IMPORTANTE: Este arquivo contém configurações sensíveis.
- * NUNCA compartilhe publicamente ou faça commit no Git.
+ *
+ * Credenciais sensíveis: use variáveis de ambiente (GOOGLE_OAUTH_*)
+ * ou o arquivo drive_config.local.php (não versionado — veja drive_config.example.php).
  */
 
-return [
-    // Caminho para o arquivo de credenciais JSON (Service Account - opcional)
+$base = [
     'credentials_path' => __DIR__ . '/grupo-raca-drive-credentials.json',
-    
-    // ID da pasta raiz no Google Drive (Shared Drive)
-    'root_folder_id' => '1bXf338lIktS_6ss1-WoKuMfI-gpWryjn',
-    
-    // OAuth Credentials (para upload centralizado - REQUERIDO)
-    // Obtenha em: https://console.cloud.google.com/apis/credentials
-    'oauth_client_id' => 'REDACTED-CLIENT-ID.apps.googleusercontent.com',
-    'oauth_client_secret' => 'REDACTED-OAUTH-CLIENT-SECRET',
-    'oauth_redirect_uri' => 'https://gruporaca.app.br/api/oauth-drive.php',
-    
-    // Escopos necessários para acessar o Google Drive
+
+    'root_folder_id' => getenv('DRIVE_ROOT_FOLDER_ID') ?: '1bXf338lIktS_6ss1-WoKuMfI-gpWryjn',
+
+    'oauth_client_id' => getenv('GOOGLE_OAUTH_CLIENT_ID') ?: '',
+    'oauth_client_secret' => getenv('GOOGLE_OAUTH_CLIENT_SECRET') ?: '',
+    'oauth_redirect_uri' => getenv('GOOGLE_OAUTH_REDIRECT_URI') ?: 'https://gruporaca.app.br/api/oauth-drive.php',
+
     'scopes' => [
         'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/drive.file'
+        'https://www.googleapis.com/auth/drive.file',
     ],
-    
-    // Configurações de upload
+
     'upload' => [
-        'max_file_size' => 1024 * 1024 * 1024, // 1GB (Google Drive suporta até 5TB)
-        'chunk_size' => 256 * 1024, // 256KB por chunk para upload resumável
+        'max_file_size' => 1024 * 1024 * 1024,
+        'chunk_size' => 256 * 1024,
         'allowed_types' => [
             'image/jpeg',
             'image/png',
@@ -37,25 +31,26 @@ return [
             'application/pdf',
             'video/mp4',
             'video/mpeg',
-            'video/quicktime', // .mov
-            'video/x-msvideo', // .avi
-            'video/x-ms-wmv', // .wmv
-            'video/webm', // .webm
-            'video/x-matroska', // .mkv
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
-        ]
+            'video/quicktime',
+            'video/x-msvideo',
+            'video/x-ms-wmv',
+            'video/webm',
+            'video/x-matroska',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ],
     ],
-    
-    // Mapeamento de pastas por usuário (será usado pelo sistema)
-    'folder_mapping' => [
-        // ROOT e ADMIN têm acesso a todas as pastas (*)
-        // USER têm acesso apenas à sua pasta específica
-        // Exemplo:
-        // 'fotografo@gruporaca.com.br' => 'fotografos',
-        // 'deolhonomarchador@gruporaca.com.br' => 'midias/de-olho-no-marchador',
-    ]
-];
-?>
 
+    'folder_mapping' => [],
+];
+
+$local = __DIR__ . '/drive_config.local.php';
+if (is_file($local)) {
+    $localConfig = require $local;
+    if (is_array($localConfig)) {
+        $base = array_replace_recursive($base, $localConfig);
+    }
+}
+
+return $base;
