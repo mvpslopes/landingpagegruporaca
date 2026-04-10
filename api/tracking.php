@@ -100,8 +100,8 @@ function getLocationByIP($ip) {
     }
     
     // Usar ip-api.com (gratuito, até 45 requisições/minuto)
-    // Alternativa: ipapi.co (gratuito, 1000 requisições/dia)
-    $url = "http://ip-api.com/json/{$ip}?fields=status,country,regionName,city";
+    // Pedimos também latitude/longitude para melhorar a precisão no mapa
+    $url = "http://ip-api.com/json/{$ip}?fields=status,country,regionName,city,lat,lon";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -125,7 +125,9 @@ function getLocationByIP($ip) {
             $location = [
                 'country' => $data['country'] ?? null,
                 'region' => $data['regionName'] ?? null, // Estado/Região
-                'city' => $data['city'] ?? null
+                'city' => $data['city'] ?? null,
+                'lat' => isset($data['lat']) ? (float)$data['lat'] : null,
+                'lon' => isset($data['lon']) ? (float)$data['lon'] : null,
             ];
             error_log("Localização obtida para IP {$ip}: " . json_encode($location));
             return $location;
@@ -157,7 +159,7 @@ $os = detectOS($userAgent);
 
 // Obter localização (apenas uma vez por sessão para evitar muitas requisições)
 $location = null;
-if ($ipAddress && $action === 'pageview') {
+    if ($ipAddress && $action === 'pageview') {
     // Verificar se já temos localização para esta sessão
     $stmt = $conn->prepare("SELECT country, city FROM page_views WHERE session_id = ? AND country IS NOT NULL LIMIT 1");
     $stmt->execute([$sessionId]);
@@ -167,11 +169,13 @@ if ($ipAddress && $action === 'pageview') {
         // Buscar localização apenas se não tivermos ainda
         $location = getLocationByIP($ipAddress);
     } else {
-        $location = [
-            'country' => $existingLocation['country'],
-            'region' => null,
-            'city' => $existingLocation['city']
-        ];
+            $location = [
+                'country' => $existingLocation['country'],
+                'region' => null,
+                'city' => $existingLocation['city'],
+                'lat' => null,
+                'lon' => null,
+            ];
     }
 }
 
@@ -254,30 +258,60 @@ try {
                 
                 if (!$stmt->fetch()) {
                     // Inserir novo page view apenas se não houver um recente
-                    // Usar localização se disponível
+                    // Usar localização se disponível (incluindo latitude/longitude, se houver)
                     $country = $location['country'] ?? null;
                     $city = $location['city'] ?? null;
-                    
-                    $stmt = $conn->prepare("
-                        INSERT INTO page_views 
-                        (session_id, page_path, page_title, referrer, ip_address, user_agent, device_type, browser, os, country, city, time_on_page, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-                    ");
-                    
-                    $stmt->execute([
-                        $sessionId,
-                        $pagePath,
-                        $pageTitle,
-                        $referrer,
-                        $ipAddress,
-                        $userAgent,
-                        $deviceType,
-                        $browser,
-                        $os,
-                        $country,
-                        $city,
-                        $timeOnPage
-                    ]);
+                    $lat = isset($location['lat']) ? $location['lat'] : null;
+                    $lon = isset($location['lon']) ? $location['lon'] : null;
+
+                    try {
+                        // Tentar inserir usando colunas latitude/longitude (nova estrutura)
+                        $stmt = $conn->prepare("
+                            INSERT INTO page_views 
+                            (session_id, page_path, page_title, referrer, ip_address, user_agent, device_type, browser, os, country, city, latitude, longitude, time_on_page, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                        ");
+                        
+                        $stmt->execute([
+                            $sessionId,
+                            $pagePath,
+                            $pageTitle,
+                            $referrer,
+                            $ipAddress,
+                            $userAgent,
+                            $deviceType,
+                            $browser,
+                            $os,
+                            $country,
+                            $city,
+                            $lat,
+                            $lon,
+                            $timeOnPage
+                        ]);
+                    } catch (PDOException $e) {
+                        // Se a tabela ainda não tiver latitude/longitude, faz insert no formato antigo
+                        error_log("page_views sem colunas latitude/longitude, usando formato antigo: " . $e->getMessage());
+                        $stmt = $conn->prepare("
+                            INSERT INTO page_views 
+                            (session_id, page_path, page_title, referrer, ip_address, user_agent, device_type, browser, os, country, city, time_on_page, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                        ");
+                        
+                        $stmt->execute([
+                            $sessionId,
+                            $pagePath,
+                            $pageTitle,
+                            $referrer,
+                            $ipAddress,
+                            $userAgent,
+                            $deviceType,
+                            $browser,
+                            $os,
+                            $country,
+                            $city,
+                            $timeOnPage
+                        ]);
+                    }
                     
                     // Atualizar sessão
                     $stmt = $conn->prepare("

@@ -847,6 +847,7 @@ export interface Auction {
   end_date: string;
   image_path?: string;
   image_drive_id?: string;
+  link_url?: string;
   active: boolean;
   status?: 'EM_BREVE' | 'NO_AR' | 'ENCERRADO';
   date_display?: string;
@@ -879,6 +880,7 @@ export async function createAuction(auctionData: {
   end_date: string;
   image_path?: string;
   image_drive_id?: string;
+  link_url?: string;
   active?: boolean;
 }): Promise<ApiResponse<Auction>> {
   try {
@@ -910,6 +912,7 @@ export async function updateAuction(auctionId: number, auctionData: {
   end_date?: string;
   image_path?: string;
   image_drive_id?: string;
+  link_url?: string;
   active?: boolean;
 }): Promise<ApiResponse<Auction>> {
   try {

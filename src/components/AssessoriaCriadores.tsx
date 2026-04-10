@@ -1,4 +1,4 @@
-import { FileText, Calendar, ClipboardList, Users, Target, Zap, Award, Phone, MessageCircle, Database, FileCheck } from 'lucide-react';
+import { FileText, Calendar, ClipboardList, Users, Target, Zap, Award, Phone, Database, FileCheck } from 'lucide-react';
 
 export default function AssessoriaCriadores() {
   const services = [
@@ -173,10 +173,38 @@ export default function AssessoriaCriadores() {
               <p className="text-base sm:text-lg font-semibold text-black mb-2">Central de Atendimento:</p>
               <a
                 href="tel:2133289772"
-                className="group bg-black text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 inline-flex text-sm sm:text-base"
+                className="group bg-black text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-gray-800 transition-all duration-300 flex flex-col items-center justify-center gap-1 shadow-lg hover:shadow-xl hover:scale-105 text-sm sm:text-base w-full max-w-[320px] min-h-[84px] mx-auto"
               >
-                <Phone size={18} className="sm:w-5 sm:h-5" />
-                (21) 3328-9772
+                <span className="flex items-center gap-2">
+                  <Phone size={18} className="sm:w-5 sm:h-5" />
+                  Ligar agora
+                </span>
+                <span className="font-semibold">(21) 3328-9772</span>
+              </a>
+            </div>
+
+            {/* WhatsApp */}
+            <div>
+              <a
+                href={`https://wa.me/5531990790604?text=${encodeURIComponent('Olá, gostaria de saber mais sobre a Assessoria Ariane Andrade.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-green-500 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold hover:bg-green-600 transition-all duration-300 flex flex-col items-center justify-center gap-1 shadow-lg shadow-green-500/20 hover:shadow-xl hover:shadow-green-500/30 hover:scale-105 text-sm sm:text-base w-full max-w-[320px] min-h-[84px] mx-auto"
+              >
+                <span className="flex items-center gap-2">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="sm:w-5 sm:h-5"
+                  >
+                    <path d="M20.52 3.48A11.91 11.91 0 0 0 12.01 0C5.38 0 .02 5.36.02 11.99c0 2.11.55 4.17 1.6 5.99L0 24l6.18-1.62a11.96 11.96 0 0 0 5.82 1.48h.01c6.63 0 11.99-5.36 11.99-11.99 0-3.2-1.25-6.21-3.48-8.39Zm-8.51 18.35h-.01a9.98 9.98 0 0 1-5.09-1.39l-.36-.21-3.67.96.98-3.58-.23-.37A9.96 9.96 0 0 1 2.02 12C2.02 6.47 6.48 2.01 12.01 2.01c2.66 0 5.16 1.04 7.04 2.92a9.9 9.9 0 0 1 2.93 7.06c0 5.52-4.46 9.84-9.97 9.84Zm5.47-7.49c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.96 1.18-.18.2-.35.22-.65.07-.3-.15-1.27-.47-2.42-1.49-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.68-1.64-.93-2.25-.24-.58-.49-.5-.68-.5h-.58c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.49 0 1.47 1.07 2.9 1.22 3.1.15.2 2.11 3.22 5.11 4.51.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.08-.13-.27-.2-.57-.35Z" />
+                  </svg>
+                  Falar no WhatsApp
+                </span>
+                <span className="font-semibold">(31) 99079-0604</span>
               </a>
             </div>
           </div>

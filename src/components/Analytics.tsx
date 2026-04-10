@@ -22,6 +22,7 @@ export default function Analytics({ user }: AnalyticsProps) {
   const [realtime, setRealtime] = useState<any>(null);
   const [locations, setLocations] = useState<any>(null);
   const [assessors, setAssessors] = useState<any>(null);
+  const [ipLocations, setIpLocations] = useState<any[] | null>(null);
   const [error, setError] = useState<string>('');
   const [helpTooltip, setHelpTooltip] = useState<string | null>(null);
   const [animatedValues, setAnimatedValues] = useState<any>({});
@@ -41,7 +42,7 @@ export default function Analytics({ user }: AnalyticsProps) {
     setError('');
     
     try {
-      const [overviewRes, pageviewsRes, devicesRes, flowRes, locationsRes, assessorsRes] = await Promise.all([
+      const [overviewRes, pageviewsRes, devicesRes, flowRes, locationsRes, assessorsRes, ipLocationsRes] = await Promise.all([
         getStatistics('overview', period),
         getStatistics('pageviews', period),
         getStatistics('devices', period),
@@ -49,6 +50,10 @@ export default function Analytics({ user }: AnalyticsProps) {
         getStatistics('locations', period),
         getStatistics('assessors', period).catch((err) => {
           console.error('Erro ao carregar assessores:', err);
+          return { data: null };
+        }),
+        getStatistics('ip_locations', period).catch((err) => {
+          console.error('Erro ao carregar localizações por IP:', err);
           return { data: null };
         }),
       ]);
@@ -83,6 +88,7 @@ export default function Analytics({ user }: AnalyticsProps) {
       if (flowRes.data) setFlow(flowRes.data);
       if (locationsRes.data) setLocations(locationsRes.data);
       if (assessorsRes.data) setAssessors(assessorsRes.data);
+      if (ipLocationsRes.data && ipLocationsRes.data.ips) setIpLocations(ipLocationsRes.data.ips);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar estatísticas');
       console.error('Erro ao carregar analytics:', err);
@@ -164,6 +170,7 @@ export default function Analytics({ user }: AnalyticsProps) {
     { value: '7d', label: '7 dias' },
     { value: '30d', label: '30 dias' },
     { value: '90d', label: '90 dias' },
+    { value: 'all', label: 'Todo período' },
   ];
 
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -784,6 +791,61 @@ export default function Analytics({ user }: AnalyticsProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Localização detalhada por IP - apenas para ROOT */}
+      {user?.role === 'root' && ipLocations && (
+        <div className="bg-white rounded-xl shadow-lg p-4 md:p-6 border border-gray-200">
+          <h3 className="text-lg md:text-xl font-bold text-black mb-4 flex items-center gap-2">
+            <MapPin size={20} className="md:w-6 md:h-6" />
+            Localização dos IPs de Acesso (Google Maps)
+          </h3>
+          {ipLocations.length === 0 ? (
+            <p className="text-gray-500 text-sm">Nenhum IP registrado no período selecionado.</p>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {ipLocations.map((item: any, index: number) => {
+                const hasCoords = item.latitude != null && item.longitude != null;
+                const labelLocation = item.city && item.country
+                  ? `${item.city}, ${item.country}`
+                  : item.country || 'Localização desconhecida';
+                const mapsQuery = hasCoords
+                  ? `${item.latitude},${item.longitude}`
+                  : (item.city || item.country ? encodeURIComponent(labelLocation) : '');
+                const mapsUrl = mapsQuery
+                  ? `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`
+                  : null;
+                return (
+                  <div
+                    key={`${item.ip_address}-${index}`}
+                    className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono text-gray-800">{item.ip_address}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {labelLocation} • {item.sessions || 0} sessão{item.sessions !== 1 ? 's' : ''} •{' '}
+                        {item.pageviews || 0} visualizaç{(item.pageviews || 0) === 1 ? 'ão' : 'ões'}
+                      </p>
+                    </div>
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-3 text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                      >
+                        Ver no Maps
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-gray-400">
+            Esta visão detalhada por IP é exibida apenas para usuários com perfil ROOT.
+          </p>
         </div>
       )}
 

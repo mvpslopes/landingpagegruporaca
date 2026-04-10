@@ -1,0 +1,8 @@
+# https://gruporaca.app.br/
+User-agent: *
+Allow: /
+
+# JSON API responses - not for indexing
+Disallow: /api/
+
+Sitemap: https://gruporaca.app.br/sitemap.xml

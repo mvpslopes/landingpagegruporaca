@@ -75,7 +75,7 @@ try {
 }
 
 $action = isset($_GET['action']) ? trim($_GET['action']) : 'overview';
-$period = isset($_GET['period']) ? trim($_GET['period']) : '7d'; // 1d, 7d, 30d, 90d, custom
+$period = isset($_GET['period']) ? trim($_GET['period']) : '7d'; // 1d, 7d, 30d, 90d, all, custom
 
 // Configurar fuso horário para Brasília
 date_default_timezone_set('America/Sao_Paulo');
@@ -97,6 +97,10 @@ switch ($period) {
         break;
     case '90d':
         $startDate->modify('-90 days');
+        break;
+    case 'all':
+        // Todo período: usa uma data de início bem antiga para abranger todos os registros
+        $startDate = new DateTime('1970-01-01 00:00:00', new DateTimeZone('America/Sao_Paulo'));
         break;
     case 'custom':
         $startDate = isset($_GET['start']) ? new DateTime($_GET['start']) : $startDate->modify('-7 days');
@@ -331,6 +335,49 @@ try {
                 'period' => $period
             ]);
             break;
+        
+        case 'auction_clicks':
+            // Cliques por leilão (CTA de leilão no site público)
+            // Agrupa cliques cujo element_type = 'auction_cta' e element_id = id do leilão
+            // Opcionalmente filtra por período usando created_at
+            try {
+                // Verificar se tabela click_events existe
+                $conn->query("SELECT 1 FROM click_events LIMIT 1");
+            } catch (PDOException $e) {
+                jsonResponse([
+                    'clicks_by_auction' => [],
+                    'period' => $period,
+                    'error' => 'Tabela click_events não encontrada'
+                ]);
+                break;
+            }
+
+            $stmt = $conn->prepare("
+                SELECT 
+                    a.id as auction_id,
+                    a.title,
+                    a.status,
+                    a.start_date,
+                    a.end_date,
+                    COUNT(ce.id) as total_clicks
+                FROM auctions a
+                INNER JOIN click_events ce 
+                    ON ce.element_type = 'auction_cta'
+                    AND ce.element_id = CAST(a.id AS CHAR)
+                    AND ce.created_at >= ? AND ce.created_at <= ?
+                GROUP BY a.id, a.title, a.status, a.start_date, a.end_date
+                HAVING total_clicks > 0
+                ORDER BY total_clicks DESC
+                LIMIT 50
+            ");
+            $stmt->execute([$startDateStr, $endDateStr]);
+            $clicksByAuction = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            jsonResponse([
+                'clicks_by_auction' => is_array($clicksByAuction) ? $clicksByAuction : [],
+                'period' => $period
+            ]);
+            break;
             
         case 'flow':
             // Fluxo de navegação
@@ -551,6 +598,75 @@ try {
             jsonResponse([
                 'countries' => $countries,
                 'cities' => $cities,
+                'period' => $period
+            ]);
+            break;
+        
+        case 'ip_locations':
+            // Lista de IPs com localização aproximada (para visualização em mapa)
+            // Apenas para usuários root, por segurança/privacidade extra
+            if (!isset($user['role']) || $user['role'] !== 'root') {
+                jsonError('Acesso negado. Apenas root pode ver localização detalhada por IP.', 403);
+            }
+
+            // Garantir que a tabela exista
+            try {
+                $conn->query("SELECT 1 FROM page_views LIMIT 1");
+            } catch (PDOException $e) {
+                jsonResponse([
+                    'ips' => [],
+                    'period' => $period,
+                    'error' => 'Tabela page_views não encontrada'
+                ]);
+                break;
+            }
+
+            // IPs agregados por país/cidade, com última data de acesso e, se disponível, latitude/longitude aproximadas
+            try {
+                // Tentar selecionar incluindo latitude/longitude (nova estrutura)
+                $stmt = $conn->prepare("
+                    SELECT 
+                        ip_address,
+                        country,
+                        city,
+                        latitude,
+                        longitude,
+                        COUNT(DISTINCT session_id) as sessions,
+                        COUNT(*) as pageviews,
+                        MAX(created_at) as last_access
+                    FROM page_views
+                    WHERE created_at >= ? AND created_at <= ? AND ip_address IS NOT NULL
+                    GROUP BY ip_address, country, city, latitude, longitude
+                    ORDER BY last_access DESC
+                    LIMIT 200
+                ");
+                $stmt->execute([$startDateStr, $endDateStr]);
+                $ips = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                // Se as colunas latitude/longitude não existirem ainda, faz fallback sem elas
+                error_log("page_views sem latitude/longitude em ip_locations, usando SELECT antigo: " . $e->getMessage());
+                $stmt = $conn->prepare("
+                    SELECT 
+                        ip_address,
+                        country,
+                        city,
+                        NULL as latitude,
+                        NULL as longitude,
+                        COUNT(DISTINCT session_id) as sessions,
+                        COUNT(*) as pageviews,
+                        MAX(created_at) as last_access
+                    FROM page_views
+                    WHERE created_at >= ? AND created_at <= ? AND ip_address IS NOT NULL
+                    GROUP BY ip_address, country, city
+                    ORDER BY last_access DESC
+                    LIMIT 200
+                ");
+                $stmt->execute([$startDateStr, $endDateStr]);
+                $ips = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            jsonResponse([
+                'ips' => is_array($ips) ? $ips : [],
                 'period' => $period
             ]);
             break;
@@ -785,6 +901,9 @@ try {
             if (isset($conversionData['total_lots']) && $conversionData['total_lots'] > 0) {
                 $conversionRate = round(($conversionData['total_sold'] / $conversionData['total_lots']) * 100, 2);
             }
+            
+            $activeCount = isset($activeAuctions['total']) ? (int)$activeAuctions['total'] : 0;
+            $completedCount = isset($completedAuctions['total']) ? (int)$completedAuctions['total'] : 0;
             
             jsonResponse([
                 'by_status' => is_array($auctionsByStatus) ? $auctionsByStatus : [],

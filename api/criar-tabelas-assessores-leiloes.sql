@@ -85,7 +85,6 @@ INSERT INTO `assessors` (`name`, `category`, `phone`, `email`, `whatsapp`) VALUE
 ('JUNINHO', 'grupo_raca', '(31) 98531-4468', 'juninho@gruporaca.com.br', '5531985314468'),
 ('JÚNIOR MARTINS', 'grupo_raca', '(31) 9721-5761', 'junior.martins@gruporaca.com.br', '553197215761'),
 ('KAIKE', 'grupo_raca', '(32) 9946-8519', 'kaike@gruporaca.com.br', '553299468519'),
-('KAUAN', 'grupo_raca', '(37) 99669-0014', 'kauan@gruporaca.com.br', '5537996690014'),
 ('LEONE', 'grupo_raca', '(21) 97969-6063', 'leone@gruporaca.com.br', '5521979696063'),
 ('MELQUIADES LEANDRO', 'grupo_raca', '(31) 9843-7379', 'melquiades.leandro@gruporaca.com.br', '553198437379'),
 ('MARCOS PIQUITO', 'grupo_raca', '(32) 9120-7075', 'marcos.piquito@gruporaca.com.br', '553291207075'),
@@ -113,7 +112,6 @@ ON DUPLICATE KEY UPDATE `phone` = VALUES(`phone`), `email` = VALUES(`email`), `w
 -- Assessorias Parceiras
 INSERT INTO `assessors` (`name`, `category`, `phone`, `email`, `whatsapp`) VALUES
 ('GREKO', 'parceiras', '(22) 99966-1061', 'greko.lima@gruporaca.com.br', '5522999661061'),
-('JEFERSON', 'parceiras', '(48) 99191-1474', 'jefferson.mattos@gruporaca.com.br', '5548991911474'),
 ('MARCELO ZEFERINO', 'parceiras', '(31) 8649-7175', 'marcelo.zeferino@gruporaca.com.br', '553186497175'),
 ('PEDRO', 'parceiras', '(32) 98813-7113', 'pedro@gruporaca.com.br', '5532988137113'),
 ('RAMIRO', 'parceiras', '(35) 9907-7171', 'ramiro@gruporaca.com.br', '553599077171'),

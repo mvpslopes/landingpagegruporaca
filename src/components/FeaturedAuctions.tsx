@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, MapPin, ArrowRight, Award } from 'lucide-react';
 import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useClickTracking } from '../hooks/useTracking';
 
 // Função auxiliar para criar datas
 function createDate(year: number, month: number, day: number): Date {
@@ -11,11 +12,12 @@ interface Auction {
   id: number;
   title: string;
   date: string;
-  startDate: string;
-  endDate: string;
+  startDate: Date;
+  endDate: Date;
   breed: string;
   image: string;
   status?: string;
+  link_url?: string;
 }
 
 
@@ -70,7 +72,8 @@ export default function FeaturedAuctions() {
               endDate: createDate(endYear, endMonth, endDay),
               breed: auction.breed,
               image: auction.image || '/leiloes/L01.jpeg', // Fallback se não tiver imagem
-              status: auction.status
+              status: auction.status,
+              link_url: auction.link_url || undefined
             };
           });
           
@@ -129,7 +132,13 @@ export default function FeaturedAuctions() {
               <p className="text-gray-600">Nenhum leilão disponível no momento</p>
             </div>
           ) : (
-            auctions.map((auction, index) => (
+            auctions.map((auction, index) => {
+            const handleAuctionClick = useClickTracking(
+              'auction_cta',
+              String(auction.id),
+              auction.title
+            );
+            return (
             <div
               key={auction.id}
               className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-gray-100 hover:border-gray-200 card-hover"
@@ -185,9 +194,10 @@ export default function FeaturedAuctions() {
                 </div>
 
                 <a
-                  href="https://gruporaca.com/"
+                  href={auction.link_url || 'https://gruporaca.com/'}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={handleAuctionClick}
                   className="w-full bg-black text-white py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 flex items-center justify-center gap-2 font-bold group-hover:shadow-lg hover:scale-[1.02] button-shine ripple-effect"
                 >
                   Ver Detalhes
@@ -195,7 +205,8 @@ export default function FeaturedAuctions() {
                 </a>
               </div>
             </div>
-            ))
+            );
+            })
           )}
         </div>
 

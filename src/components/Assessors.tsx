@@ -49,7 +49,6 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'JM': { phone: '(37) 99963-6962', whatsapp: '5537999636962', email: 'jm.assessoria@gruporaca.com.br' },
   'JOÃO PAULO': { phone: '(12) 99715-5058', whatsapp: '5512997155058', email: 'joao.paulo@gruporaca.com.br' },
   'JUNINHO': { phone: '(31) 98531-4468', whatsapp: '5531985314468', email: 'juninho@gruporaca.com.br' },
-  'KAUAN': { phone: '(37) 99669-0014', whatsapp: '5537996690014', email: 'kauan@gruporaca.com.br' },
   'QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GABRIEL QUEIXADA': { phone: '(32) 98873-7345', whatsapp: '5532988737345', email: 'gabriel.queixada@gruporaca.com.br' },
   'GREGÓRIO': { phone: '(21) 98166-1949', whatsapp: '5521981661949', email: 'gregorio.neves@gruporaca.com.br' },
@@ -60,7 +59,6 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'JOAN': { phone: '(71) 99957-5796', whatsapp: '5571999575796', email: 'joann.alves@gruporaca.com.br' },
   'JOANN ALVES': { phone: '(71) 99957-5796', whatsapp: '5571999575796', email: 'joann.alves@gruporaca.com.br' },
   'PEDRO': { phone: '(32) 98813-7113', whatsapp: '5532988137113', email: 'pedro@gruporaca.com.br' },
-  'JEFERSON': { phone: '(48) 99191-1474', whatsapp: '5548991911474', email: 'jefferson.mattos@gruporaca.com.br' },
   'GREKO': { phone: '(22) 99966-1061', whatsapp: '5522999661061', email: 'greko.lima@gruporaca.com.br' },
   'TRANCA': { phone: '(32) 99905-4175', whatsapp: '5532999054175', email: 'marcelo.tranca@gruporaca.com.br' },
   'ANDRE': { phone: '(75) 9888-9377', whatsapp: '557598889377', email: 'andre@gruporaca.com.br' },
@@ -102,6 +100,8 @@ const existingAssessors: Record<string, { phone: string; whatsapp: string; email
   'MELQUIADES LEANDRO': { phone: '(31) 9843-7379', whatsapp: '553198437379', email: 'melquiades.leandro@gruporaca.com.br' },
   'ROGÉRIO FÁVERO': { phone: '(27) 99961-6321', whatsapp: '5527999616321', email: 'rogerio.favero@gruporaca.com.br' },
   'RAÇA E MARCHA': { phone: '(31) 9826-7101', whatsapp: '553198267101', email: '' },
+  'BRUNO LAGARTIXA': { phone: '(31) 97153-7765', whatsapp: '5531971537765', email: '' },
+  'GUI BARBOSA': { phone: '(31) 99692-1015', whatsapp: '5531996921015', email: '' },
 };
 
 // Função auxiliar para formatar nome - FORÇA MAIÚSCULAS
@@ -144,7 +144,6 @@ const assessoriaGrupoRacaList = [
   'ERICK',
   'FELIPE SÁ',
   'GABRIEL',
-  'GABRIEL QUEIXADA',
   'GABRIELA',
   'GREGÓRIO',
   'HUGO FERRARI',
@@ -155,7 +154,6 @@ const assessoriaGrupoRacaList = [
   'JUNINHO',
   'JÚNIOR MARTINS',
   'KAIKE',
-  'KAUAN',
   'LEONE',
   'MELQUIADES LEANDRO',
   'MARCOS PIQUITO',
@@ -163,7 +161,6 @@ const assessoriaGrupoRacaList = [
   'MICHEL GODOI',
   'RAFAEL R.A',
   'WALLACE',
-  'STEVAN',
   'TILÃO',
   'VERONESE',
   'VINÍCIUS RODRIGUES',
@@ -187,8 +184,9 @@ const assessoria = [
 
 // Assessorias Parceiras (em ordem alfabética)
 const assessoriasParceiras = [
+  'BRUNO LAGARTIXA',
+  'GUI barbosa',
   'GREKO',
-  'JEFERSON',
   'MARCELO ZEFERINO',
   'MICHEL GODOI',
   'PEDRO',

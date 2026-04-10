@@ -11,6 +11,21 @@ require_once 'db_config.php';
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $conn = getDBConnection();
+
+        // Desativar automaticamente leilões encerrados (end_date < hoje)
+        // Assim eles deixam de aparecer no site e ficam como "Inativo" no painel.
+        try {
+            $stmt = $conn->prepare("
+                UPDATE auctions
+                SET active = 0
+                WHERE active = 1
+                  AND end_date < CURDATE()
+            ");
+            $stmt->execute();
+        } catch (Exception $e) {
+            // Não bloquear o carregamento público caso falhe a manutenção
+            error_log('Aviso: não foi possível desativar leilões encerrados: ' . $e->getMessage());
+        }
         
         // Buscar apenas leilões ativos, ordenados por data de início
         $stmt = $conn->prepare("
@@ -21,9 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 start_date,
                 end_date,
                 image_path,
-                image_drive_id
+                image_drive_id,
+                link_url
             FROM auctions
             WHERE active = 1
+              AND end_date >= CURDATE()
             ORDER BY start_date ASC, created_at DESC
         ");
         $stmt->execute();
@@ -93,6 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     ?: ($auction['image_drive_id'] 
                         ? '/api/view-auction-image.php?id=' . $auction['image_drive_id'] 
                         : ''),
+                'link_url' => $auction['link_url'] ?: null,
                 'status' => $status
             ];
         }

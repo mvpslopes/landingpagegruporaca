@@ -13,24 +13,32 @@ ALTER TABLE `auctions`
 ADD COLUMN `image_drive_id` VARCHAR(255) DEFAULT NULL COMMENT 'ID do arquivo no Google Drive (se usar Drive)' 
 AFTER `image_path`;
 
--- 3. Adicionar coluna active
+-- 3. Adicionar coluna link_url (redirecionamento)
 ALTER TABLE `auctions` 
-ADD COLUMN `active` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Se o leilão está ativo (aparece no site)' 
+ADD COLUMN `link_url` VARCHAR(500) DEFAULT NULL COMMENT 'Link de redirecionamento do leilão (ex: https://...)'
 AFTER `image_drive_id`;
 
--- 4. Adicionar coluna created_by
+-- 4. Adicionar coluna active
+ALTER TABLE `auctions` 
+ADD COLUMN `active` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Se o leilão está ativo (aparece no site)' 
+AFTER `link_url`;
+
+-- 5. Adicionar coluna created_by
 ALTER TABLE `auctions` 
 ADD COLUMN `created_by` INT(11) UNSIGNED DEFAULT NULL COMMENT 'ID do usuário que criou o leilão' 
 AFTER `active`;
 
--- 5. Adicionar índice idx_active
+-- 6. Adicionar índice idx_active
 CREATE INDEX `idx_active` ON `auctions` (`active`);
 
--- 6. Ajustar end_date para NOT NULL (opcional - apenas se quiser forçar)
+-- 7. (Opcional) Índice idx_link_url
+CREATE INDEX `idx_link_url` ON `auctions` (`link_url`);
+
+-- 8. Ajustar end_date para NOT NULL (opcional - apenas se quiser forçar)
 -- ALTER TABLE `auctions` 
 -- MODIFY COLUMN `end_date` DATETIME NOT NULL;
 
--- 7. Verificar estrutura final
+-- 9. Verificar estrutura final
 DESCRIBE `auctions`;
 
 -- ============================================

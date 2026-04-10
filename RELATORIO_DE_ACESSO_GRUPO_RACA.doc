@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relatório de Acesso e Permissões — Grupo Raça</title>
+  <style>
+    /* Documento em HTML compatível com Word (salvo como .doc) */
+    @page { margin: 22mm 18mm; }
+    body {
+      font-family: Calibri, "Segoe UI", Arial, sans-serif;
+      color: #111;
+      line-height: 1.35;
+      font-size: 11pt;
+    }
+    .muted { color: #555; }
+    .small { font-size: 9.5pt; }
+    .page-break { page-break-before: always; }
+    .cover {
+      border: 1px solid #E6E6E6;
+      padding: 18mm 14mm;
+      border-radius: 10px;
+      background: #FAFAFA;
+    }
+    .brand {
+      display: table;
+      width: 100%;
+      margin-bottom: 14mm;
+    }
+    .brand-left { display: table-cell; vertical-align: middle; }
+    .brand-right { display: table-cell; vertical-align: middle; text-align: right; }
+    .chip {
+      display: inline-block;
+      background: #111;
+      color: #FFF;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 9pt;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 22pt;
+      margin: 0 0 6mm 0;
+      line-height: 1.15;
+    }
+    h2 {
+      font-size: 14.5pt;
+      margin: 10mm 0 4mm 0;
+    }
+    h3 {
+      font-size: 12pt;
+      margin: 7mm 0 3mm 0;
+    }
+    .meta {
+      margin-top: 8mm;
+      border-top: 1px solid #E6E6E6;
+      padding-top: 6mm;
+    }
+    .box {
+      border: 1px solid #E6E6E6;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #FFF;
+      margin: 4mm 0;
+    }
+    .kvs { display: table; width: 100%; }
+    .kv { display: table-row; }
+    .k { display: table-cell; width: 34%; padding: 4px 0; color: #333; font-weight: 700; }
+    .v { display: table-cell; padding: 4px 0; color: #111; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 3mm 0 6mm 0;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #E6E6E6;
+      padding: 7px 8px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    th {
+      background: #111;
+      color: #FFF;
+      font-weight: 700;
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .thead-light th {
+      background: #F2F2F2;
+      color: #111;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 10pt;
+    }
+    .ok { color: #0B6B3A; font-weight: 700; }
+    .no { color: #8A1F11; font-weight: 700; }
+    .warn { color: #7A5B00; font-weight: 700; }
+    .note {
+      font-size: 9.5pt;
+      color: #444;
+    }
+    ul { margin: 2mm 0 2mm 6mm; }
+    li { margin: 1mm 0; }
+    .footer {
+      margin-top: 10mm;
+      padding-top: 4mm;
+      border-top: 1px solid #E6E6E6;
+      font-size: 9pt;
+      color: #666;
+    }
+    .sig {
+      display: table;
+      width: 100%;
+      margin-top: 8mm;
+    }
+    .sig-col { display: table-cell; width: 50%; padding-right: 10mm; }
+    .line {
+      border-bottom: 1px solid #999;
+      height: 18px;
+      margin-top: 10mm;
+    }
+  </style>
+  <!--
+    Observação:
+    Este arquivo é um HTML salvo com extensão .doc para abrir no Word.
+    Você pode "Salvar como PDF" no próprio Word para gerar um PDF final.
+  -->
+</head>
+<body>
+
+  <div class="cover">
+    <div class="brand">
+      <div class="brand-left">
+        <div class="chip">Sistema Interno</div>
+      </div>
+      <div class="brand-right">
+        <div class="small muted">Grupo Raça</div>
+      </div>
+    </div>
+
+    <h1>Relatório de Acesso e Permissões</h1>
+    <div class="muted">Matriz de perfis de acesso e resumo de ações permitidas no sistema.</div>
+
+    <div class="meta">
+      <div class="kvs">
+        <div class="kv">
+          <div class="k">Cliente</div>
+          <div class="v">____________________________________________</div>
+        </div>
+        <div class="kv">
+          <div class="k">Sistema</div>
+          <div class="v">Landing / Sistema Interno — Grupo Raça</div>
+        </div>
+        <div class="kv">
+          <div class="k">Data</div>
+          <div class="v">____/____/________</div>
+        </div>
+        <div class="kv">
+          <div class="k">Responsável</div>
+          <div class="v">____________________________________________</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Documento gerado para apresentação ao cliente. Para emitir PDF: abra no Word e selecione <b>Arquivo → Salvar Como → PDF</b>.
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2>1) Escopo do relatório</h2>
+  <div class="box">
+    <div><b>Objetivo:</b> apresentar, de forma clara e profissional, <b>o que cada perfil de usuário pode ver e fazer</b> no sistema.</div>
+    <div class="note" style="margin-top:6px">
+      As permissões são aplicadas por perfil (<i>role</i>) e, em alguns casos, por pasta vinculada ao usuário.
+    </div>
+  </div>
+
+  <h2>2) Matriz de perfis (visão gerencial)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">Perfil</th>
+        <th style="width: 26%;">Pode ver</th>
+        <th style="width: 30%;">Pode fazer</th>
+        <th style="width: 30%;">Restrições / Observações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>ROOT</b></td>
+        <td>
+          <div class="ok">Tudo</div>
+          <div class="note">Acesso total ao sistema.</div>
+        </td>
+        <td>
+          <div class="ok">Tudo</div>
+          <div class="note">Inclui gestão de usuários e permissões.</div>
+        </td>
+        <td class="note">
+          Perfil superadministrador (uso restrito).
+        </td>
+      </tr>
+      <tr>
+        <td><b>ADMIN</b></td>
+        <td>
+          <div class="ok">Conteúdo e módulos</div>
+          <div class="note">Ex.: estatísticas, leilões, listagem de usuários.</div>
+        </td>
+        <td>
+          <div class="ok">Operações gerais</div>
+          <div class="note">Pode administrar o conteúdo, mas não governa o acesso.</div>
+        </td>
+        <td class="note">
+          <div class="no">Não gerencia usuários/permissões</div>
+          (criar/editar/excluir usuários e editar permissões).
+        </td>
+      </tr>
+      <tr>
+        <td><b>VIEWER</b></td>
+        <td>
+          <div class="ok">Visualização ampla</div>
+          <div class="note">Pode visualizar todas as pastas.</div>
+        </td>
+        <td>
+          <div class="ok">Upload / Download</div>
+          <div class="note"><span class="no">Sem exclusão</span>.</div>
+        </td>
+        <td class="note">
+          Não pode deletar nem gerenciar usuários/permissões.
+        </td>
+      </tr>
+      <tr>
+        <td><b>ASSESSOR</b></td>
+        <td>
+          <div class="ok">Visualização ampla</div>
+          <div class="note">Com bloqueio para pastas vinculadas a usuários “user”.</div>
+        </td>
+        <td>
+          <div class="warn">Upload apenas na própria pasta</div>
+          <div class="note">Download e visualização em outras pastas (raiz) permitido.</div>
+        </td>
+        <td class="note">
+          <div class="no">Nunca pode deletar</div> e não gerencia usuários/permissões.
+          Upload restrito à pasta do assessor (ex.: <b>ASSESSORES</b>).
+        </td>
+      </tr>
+      <tr>
+        <td><b>USER</b></td>
+        <td>
+          <div class="ok">Somente própria pasta</div>
+          <div class="note">E subpastas dentro dela.</div>
+        </td>
+        <td>
+          <div class="warn">Ações dependem das permissões</div>
+          <div class="note">Upload/Download conforme liberado.</div>
+        </td>
+        <td class="note">
+          Não pode deletar nem gerenciar usuários/permissões.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>3) Permissões detalhadas (checklist)</h2>
+  <div class="note">
+    Legenda: <span class="ok">SIM</span> • <span class="no">NÃO</span> • <span class="warn">CONDICIONAL</span>
+  </div>
+  <table class="thead-light">
+    <thead>
+      <tr>
+        <th>Perfil</th>
+        <th>Upload</th>
+        <th>Download</th>
+        <th>Deletar</th>
+        <th>Ver todas as pastas</th>
+        <th>Gerenciar usuários</th>
+        <th>Gerenciar permissões</th>
+        <th>Gerenciar leilões</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>ROOT</b></td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+      </tr>
+      <tr>
+        <td><b>ADMIN</b></td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="ok">SIM</td>
+      </tr>
+      <tr>
+        <td><b>VIEWER</b></td>
+        <td class="ok">SIM</td>
+        <td class="ok">SIM</td>
+        <td class="no">NÃO</td>
+        <td class="ok">SIM</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+      </tr>
+      <tr>
+        <td><b>ASSESSOR</b></td>
+        <td class="warn">COND.</td>
+        <td class="ok">SIM</td>
+        <td class="no">NÃO</td>
+        <td class="warn">COND.</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+      </tr>
+      <tr>
+        <td><b>USER</b></td>
+        <td class="warn">COND.</td>
+        <td class="warn">COND.</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+        <td class="no">NÃO</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Notas rápidas sobre “Condicional”</h3>
+  <ul class="note">
+    <li><b>ASSESSOR (Upload)</b>: permitido apenas na pasta do assessor (ex.: <b>ASSESSORES</b> ou a pasta vinculada ao assessor).</li>
+    <li><b>ASSESSOR (Ver todas as pastas)</b>: pode ver outras pastas da raiz, mas <b>não pode acessar pastas vinculadas a usuários do tipo “user”</b>.</li>
+    <li><b>USER (Upload/Download)</b>: depende das permissões específicas atribuídas e do escopo da própria pasta.</li>
+  </ul>
+
+  <div class="page-break"></div>
+
+  <h2>4) Lista de usuários (para preenchimento)</h2>
+  <div class="box">
+    <div><b>Como usar:</b> preencha esta tabela com os usuários cadastrados e marque as permissões de acordo com o perfil e/ou regras específicas.</div>
+    <div class="note">Se quiser, eu consigo gerar essa lista automaticamente também — basta você me enviar uma exportação (CSV/print) dos usuários (nome, email, perfil e pasta) ou um dump sem senha.</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Nome</th>
+        <th style="width: 23%;">Email</th>
+        <th style="width: 10%;">Perfil</th>
+        <th style="width: 13%;">Pasta</th>
+        <th style="width: 34%;">Pode ver / pode fazer (resumo)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>5) Aprovação</h2>
+  <div class="sig">
+    <div class="sig-col">
+      <div class="small muted">Responsável (Grupo Raça)</div>
+      <div class="line"></div>
+    </div>
+    <div class="sig-col">
+      <div class="small muted">Cliente</div>
+      <div class="line"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><b>Relatório de Acesso e Permissões</b> — Grupo Raça</div>
+    <div class="small">Versão: 1.0 • Documento para envio ao cliente</div>
+  </div>
+
+</body>
+</html>
+

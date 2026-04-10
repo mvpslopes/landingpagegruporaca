@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `auctions` (
   `end_date` DATE NOT NULL COMMENT 'Data de Fim do Leilão',
   `image_path` VARCHAR(500) DEFAULT NULL COMMENT 'Caminho da imagem do leilão (salva no Google Drive ou servidor)',
   `image_drive_id` VARCHAR(255) DEFAULT NULL COMMENT 'ID do arquivo no Google Drive (se usar Drive)',
+  `link_url` VARCHAR(500) DEFAULT NULL COMMENT 'Link de redirecionamento do leilão (ex: https://...)',
   `active` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Se o leilão está ativo (aparece no site)',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `auctions` (
   INDEX `idx_start_date` (`start_date`),
   INDEX `idx_end_date` (`end_date`),
   INDEX `idx_active` (`active`),
+  INDEX `idx_link_url` (`link_url`),
   INDEX `idx_breed` (`breed`),
   FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS `auctions` (
 -- - end_date: Data de fim (formato DATE: YYYY-MM-DD)
 -- - image_path: Caminho relativo da imagem (ex: /leiloes/L01.jpeg) OU caminho no Drive
 -- - image_drive_id: ID do arquivo no Google Drive (se usar Drive para armazenar)
+-- - link_url: Link opcional para "Ver Detalhes" no card do leilão
 -- - active: Se false, o leilão não aparece no site (mas fica no banco)
 -- - created_by: Usuário que criou (para auditoria)
 --

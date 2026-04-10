@@ -18,6 +18,21 @@ if ($user['role'] !== 'root' && $user['role'] !== 'admin') {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $conn = getDBConnection();
+
+        // Desativar automaticamente leilões encerrados (end_date < hoje)
+        // Mantém o campo "active" coerente sem depender de ação manual.
+        try {
+            $stmt = $conn->prepare("
+                UPDATE auctions
+                SET active = 0
+                WHERE active = 1
+                  AND end_date < CURDATE()
+            ");
+            $stmt->execute();
+        } catch (Exception $e) {
+            // Não bloquear listagem no painel caso falhe a manutenção
+            error_log('Aviso: não foi possível desativar leilões encerrados: ' . $e->getMessage());
+        }
         
         // Buscar todos os leilões (ativos e inativos)
         $stmt = $conn->prepare("
@@ -29,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 end_date,
                 image_path,
                 image_drive_id,
+                link_url,
                 active,
                 created_at,
                 updated_at,
@@ -88,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endDate = $data['end_date'] ?? '';
         $imagePath = trim($data['image_path'] ?? '');
         $imageDriveId = trim($data['image_drive_id'] ?? '');
+        $linkUrl = trim($data['link_url'] ?? '');
         $active = isset($data['active']) ? (bool)$data['active'] : true;
         
         // Validações
@@ -118,13 +135,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($startDateObj > $endDateObj) {
             jsonError('Data de início não pode ser posterior à data de fim', 400);
         }
+
+        // Normalizar/validar link (opcional)
+        if (!empty($linkUrl)) {
+            // Se usuário colar sem protocolo, assumir https://
+            if (!preg_match('/^https?:\/\//i', $linkUrl)) {
+                $linkUrl = 'https://' . $linkUrl;
+            }
+            if (!filter_var($linkUrl, FILTER_VALIDATE_URL)) {
+                jsonError('Link do leilão inválido. Use uma URL válida (ex: https://...)', 400);
+            }
+        }
         
         $conn = getDBConnection();
         
         $stmt = $conn->prepare("
             INSERT INTO auctions 
-            (title, breed, start_date, end_date, image_path, image_drive_id, active, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (title, breed, start_date, end_date, image_path, image_drive_id, link_url, active, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -134,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $endDate,
             $imagePath ?: null,
             $imageDriveId ?: null,
+            $linkUrl ?: null,
             $active ? 1 : 0,
             $user['id']
         ]);
@@ -242,6 +271,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
         if (isset($data['image_drive_id'])) {
             $updateFields[] = "image_drive_id = ?";
             $updateValues[] = trim($data['image_drive_id']) ?: null;
+        }
+
+        if (array_key_exists('link_url', $data)) {
+            $linkUrl = trim((string)$data['link_url']);
+            if ($linkUrl !== '') {
+                if (!preg_match('/^https?:\/\//i', $linkUrl)) {
+                    $linkUrl = 'https://' . $linkUrl;
+                }
+                if (!filter_var($linkUrl, FILTER_VALIDATE_URL)) {
+                    jsonError('Link do leilão inválido. Use uma URL válida (ex: https://...)', 400);
+                }
+                $updateFields[] = "link_url = ?";
+                $updateValues[] = $linkUrl;
+            } else {
+                // Permitir limpar o link
+                $updateFields[] = "link_url = ?";
+                $updateValues[] = null;
+            }
         }
         
         if (isset($data['active'])) {

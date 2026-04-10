@@ -49,7 +49,7 @@ try {
     
     // 2. Verificar se os assessores mencionados existem no banco
     echo "2. Verificando assessores mencionados na lista...\n";
-    $assessorsToCheck = ['RAFAEL R.A', 'FELIPE SÁ', 'GREKO', 'KAUAN', 'DAVID CHARLES'];
+    $assessorsToCheck = ['RAFAEL R.A', 'FELIPE SÁ', 'GREKO', 'DAVID CHARLES'];
     foreach ($assessorsToCheck as $name) {
         $stmt = $conn->prepare("SELECT id, name, category, active FROM assessors WHERE UPPER(TRIM(name)) = ?");
         $stmt->execute([strtoupper(trim($name))]);
@@ -139,7 +139,7 @@ try {
     // 5. Verificar possíveis problemas de matching de nomes
     echo "5. Verificando possíveis problemas de matching...\n";
     echo "   Testando busca por nome (como o tracking faz):\n";
-    $testNames = ['RAFAEL R.A', 'FELIPE SÁ', 'GREKO', 'KAUAN', 'DAVID CHARLES'];
+    $testNames = ['RAFAEL R.A', 'FELIPE SÁ', 'GREKO', 'DAVID CHARLES'];
     foreach ($testNames as $testName) {
         $nameUpper = strtoupper(trim($testName));
         $stmt = $conn->prepare("SELECT id, name, category FROM assessors WHERE UPPER(TRIM(name)) = ?");
