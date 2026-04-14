@@ -8,4 +8,5 @@ return [
     'oauth_client_secret' => 'SEU_CLIENT_SECRET',
     'oauth_redirect_uri' => 'https://gruporaca.app.br/api/oauth-drive.php',
     // 'root_folder_id' => 'ID_DA_PASTA_DRIVE',
+    // 'verify_drive_token' => false, // só se a hospedagem não conseguir chamar googleapis a partir do PHP
 ];

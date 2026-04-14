@@ -8,9 +8,23 @@
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file';
 
+/** Mesma base que api.ts — evita pedir token no host errado quando VITE_API_URL está definido */
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+
 // Cache do token de acesso
 let cachedAccessToken: string | null = null;
 let tokenExpiryTime: number = 0;
+/** Último erro JSON de get-drive-token.php (para mensagens ao usuário) */
+let lastDriveTokenError: string | null = null;
+
+export function invalidateAccessTokenCache(): void {
+  cachedAccessToken = null;
+  tokenExpiryTime = 0;
+}
+
+export function getLastDriveTokenError(): string | null {
+  return lastDriveTokenError;
+}
 
 /**
  * Inicializar Google Drive API (não necessário mais, mas mantido para compatibilidade)
@@ -27,8 +41,9 @@ export async function initGoogleDriveAPI(): Promise<boolean> {
 export async function isAuthenticated(): Promise<boolean> {
   // Sempre verificar com o servidor (token centralizado)
   try {
-    const response = await fetch('/api/get-drive-token.php', {
+    const response = await fetch(`${API_BASE}/get-drive-token.php?_=${Date.now()}`, {
       credentials: 'include',
+      cache: 'no-store',
     });
     return response.ok;
   } catch (error) {
@@ -38,33 +53,48 @@ export async function isAuthenticated(): Promise<boolean> {
 
 /**
  * Obter token de acesso centralizado do servidor
+ * @param forceRefresh — ignora cache e pede renovação via refresh_token no servidor (?refresh=1)
  */
-export async function getAccessToken(): Promise<string | null> {
-  // Verificar cache
-  if (cachedAccessToken && Date.now() < tokenExpiryTime) {
+export async function getAccessToken(forceRefresh = false): Promise<string | null> {
+  lastDriveTokenError = null;
+  if (!forceRefresh && cachedAccessToken && Date.now() < tokenExpiryTime) {
     return cachedAccessToken;
   }
 
   try {
-    // Obter token centralizado do servidor
-    const response = await fetch('/api/get-drive-token.php', {
+    const ts = `_=${Date.now()}`;
+    const url = forceRefresh
+      ? `${API_BASE}/get-drive-token.php?refresh=1&${ts}`
+      : `${API_BASE}/get-drive-token.php?${ts}`;
+    const response = await fetch(url, {
       credentials: 'include',
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao obter token');
+      const error = await response.json().catch(() => ({}));
+      const msg = (error as { error?: string }).error || `HTTP ${response.status}`;
+      lastDriveTokenError = msg;
+      throw new Error(msg);
     }
 
     const data = await response.json();
-    cachedAccessToken = data.access_token;
-    // Token expira em expires_in segundos, renovar 5 minutos antes
-    const expiresIn = (data.expires_in || 3600) - 300;
+    const raw = data.access_token;
+    if (typeof raw !== 'string' || !raw.trim()) {
+      console.error('get-drive-token retornou access_token vazio ou inválido');
+      lastDriveTokenError = 'Resposta sem access_token';
+      return null;
+    }
+    cachedAccessToken = raw.trim();
+    const expiresIn = Math.max(60, (data.expires_in || 3600) - 300);
     tokenExpiryTime = Date.now() + expiresIn * 1000;
 
     return cachedAccessToken;
   } catch (error: any) {
     console.error('Erro ao obter token:', error);
+    if (!lastDriveTokenError && error?.message) {
+      lastDriveTokenError = String(error.message);
+    }
     return null;
   }
 }
@@ -74,8 +104,9 @@ export async function getAccessToken(): Promise<string | null> {
  */
 export async function checkAuthorization(): Promise<boolean> {
   try {
-    const response = await fetch('/api/get-drive-token.php', {
+    const response = await fetch(`${API_BASE}/get-drive-token.php?_=${Date.now()}`, {
       credentials: 'include',
+      cache: 'no-store',
     });
     return response.ok;
   } catch (error) {
@@ -101,7 +132,7 @@ async function getFolderId(folderPath: string, accessToken: string): Promise<str
   // Se for pasta raiz, buscar do backend
   if (folderPath === '*') {
     try {
-      const response = await fetch('/api/folders.php?action=getFolderId&path=*', {
+      const response = await fetch(`${API_BASE}/folders.php?action=getFolderId&path=*`, {
         credentials: 'include',
       });
       if (response.ok) {
@@ -120,7 +151,7 @@ async function getFolderId(folderPath: string, accessToken: string): Promise<str
   try {
     // Usar backend para buscar pasta (mais confiável, suporta Shared Drives e case-insensitive)
     console.log(`🔍 Buscando pasta: '${folderPath}' via backend...`);
-    const response = await fetch(`/api/folders.php?action=getFolderId&path=${encodeURIComponent(folderPath)}`, {
+    const response = await fetch(`${API_BASE}/folders.php?action=getFolderId&path=${encodeURIComponent(folderPath)}`, {
       credentials: 'include',
     });
 
@@ -199,7 +230,7 @@ async function getFolderId(folderPath: string, accessToken: string): Promise<str
     console.error('❌ Erro ao buscar pasta:', error);
     // Em caso de erro, tentar obter root folder ID do backend
     try {
-      const response = await fetch('/api/folders.php?action=getFolderId&path=*', {
+      const response = await fetch(`${API_BASE}/folders.php?action=getFolderId&path=*`, {
         credentials: 'include',
       });
       if (response.ok) {
@@ -224,27 +255,37 @@ async function createResumableUploadSession(
   fileName: string,
   mimeType: string,
   folderId: string,
-  accessToken: string
+  auth: { token: string }
 ): Promise<string> {
   const metadata = {
     name: fileName,
     parents: [folderId],
   };
 
-  // Adicionar supportsAllDrives=true para suportar Shared Drives
-  const response = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': mimeType,
-        'X-Upload-Content-Length': '0', // Será atualizado durante upload
-      },
-      body: JSON.stringify(metadata),
+  const postSession = (token: string) =>
+    fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Upload-Content-Type': mimeType,
+          'X-Upload-Content-Length': '0',
+        },
+        body: JSON.stringify(metadata),
+      }
+    );
+
+  let response = await postSession(auth.token);
+  if (response.status === 401) {
+    invalidateAccessTokenCache();
+    const fresh = await getAccessToken(true);
+    if (fresh) {
+      auth.token = fresh;
+      response = await postSession(fresh);
     }
-  );
+  }
 
   if (!response.ok) {
     const error = await response.text();
@@ -266,7 +307,7 @@ async function createResumableUploadSession(
 async function uploadChunks(
   file: File,
   uploadUrl: string,
-  accessToken: string,
+  auth: { token: string },
   fileName: string,
   mimeType: string,
   folderId: string,
@@ -295,7 +336,7 @@ async function uploadChunks(
         const response = await fetch(currentUploadUrl, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${auth.token}`,
             'Content-Length': contentLength.toString(),
             'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${file.size}`,
           },
@@ -331,7 +372,7 @@ async function uploadChunks(
                 fileName,
                 mimeType,
                 folderId,
-                accessToken
+                auth
               );
               currentUploadUrl = newUploadUrl;
               console.log(`✅ Sessão recriada. Tentando novamente chunk ${chunkIndex + 1}...`);
@@ -350,9 +391,9 @@ async function uploadChunks(
             try {
               // Tentar renovar token antes de recriar sessão
               try {
-                const newToken = await getAccessToken();
-                if (newToken && newToken !== accessToken) {
-                  accessToken = newToken;
+                const newToken = await getAccessToken(true);
+                if (newToken && newToken !== auth.token) {
+                  auth.token = newToken;
                   console.log('✅ Token renovado antes de recriar sessão');
                 }
               } catch (tokenError) {
@@ -363,7 +404,7 @@ async function uploadChunks(
                 fileName,
                 mimeType,
                 folderId,
-                accessToken
+                auth
               );
               currentUploadUrl = newUploadUrl;
               console.log(`✅ Sessão recriada. Tentando novamente chunk ${chunkIndex + 1}...`);
@@ -393,10 +434,9 @@ async function uploadChunks(
             if (retries > 0) {
               try {
                 console.log('🔄 Tentando renovar token de acesso...');
-                const newToken = await getAccessToken();
-                if (newToken && newToken !== accessToken) {
-                  // Token foi renovado, atualizar
-                  accessToken = newToken;
+                const newToken = await getAccessToken(true);
+                if (newToken && newToken !== auth.token) {
+                  auth.token = newToken;
                   console.log('✅ Token renovado com sucesso');
                 }
               } catch (tokenError) {
@@ -407,6 +447,18 @@ async function uploadChunks(
             // Última tentativa falhou - lançar erro mais descritivo
             throw new Error('Google Drive está temporariamente indisponível (503). O serviço pode estar sobrecarregado. Por favor, tente novamente em alguns minutos.');
           }
+        } else if (response.status === 401) {
+          console.warn('⚠️ 401 no chunk — credenciais OAuth inválidas ou expiradas; renovando token...');
+          invalidateAccessTokenCache();
+          const fresh = await getAccessToken(true);
+          if (fresh) {
+            auth.token = fresh;
+            continue;
+          }
+          const errBody = await response.text();
+          throw new Error(
+            `Google Drive recusou o token (401). Reautorize o Drive em /api/oauth-drive.php ou verifique o arquivo de token no servidor. ${errBody.substring(0, 200)}`
+          );
         } else {
           const errorText = await response.text();
           let errorMessage = `Erro no upload: ${response.status}`;
@@ -446,7 +498,7 @@ async function uploadChunks(
 async function uploadFileSimple(
   file: File,
   folderId: string,
-  accessToken: string,
+  auth: { token: string },
   onProgress?: (progress: number) => void
 ): Promise<string> {
   const metadata = {
@@ -483,6 +535,8 @@ async function uploadFileSimple(
             } catch (e) {
               reject(new Error('Erro ao processar resposta do upload'));
             }
+          } else if (xhr.status === 401) {
+            reject(new Error('401_UNAUTHORIZED'));
           } else if (xhr.status === 503) {
             // Service Unavailable - tentar novamente
             reject(new Error('503_SERVICE_UNAVAILABLE'));
@@ -514,7 +568,7 @@ async function uploadFileSimple(
 
         // Adicionar supportsAllDrives=true para suportar Shared Drives
         xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true');
-        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${auth.token}`);
         xhr.send(formData);
       });
 
@@ -524,14 +578,23 @@ async function uploadFileSimple(
       retries--;
 
       // Tratar diferentes tipos de erro
-      if (error.message === '503_SERVICE_UNAVAILABLE' && retries > 0) {
+      if (error.message === '401_UNAUTHORIZED' && retries > 0) {
+        console.warn('⚠️ Upload multipart retornou 401 — renovando token OAuth no servidor...');
+        invalidateAccessTokenCache();
+        const fresh = await getAccessToken(true);
+        if (fresh) {
+          auth.token = fresh;
+          console.log('✅ Novo access token obtido após 401');
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      } else if (error.message === '503_SERVICE_UNAVAILABLE' && retries > 0) {
         // Service Unavailable - tentar renovar token e tentar novamente
         console.warn(`⚠️ Google Drive indisponível (503). Tentando renovar token e tentar novamente... (${4 - retries}/3)`);
         
         try {
-          const newToken = await getAccessToken();
-          if (newToken && newToken !== accessToken) {
-            accessToken = newToken;
+          const newToken = await getAccessToken(true);
+          if (newToken && newToken !== auth.token) {
+            auth.token = newToken;
             console.log('✅ Token renovado');
           }
         } catch (tokenError) {
@@ -547,9 +610,9 @@ async function uploadFileSimple(
         console.warn(`⚠️ Erro 404 (pasta não encontrada ou sem permissão). Tentando renovar token... (${4 - retries}/3)`);
         
         try {
-          const newToken = await getAccessToken();
-          if (newToken && newToken !== accessToken) {
-            accessToken = newToken;
+          const newToken = await getAccessToken(true);
+          if (newToken && newToken !== auth.token) {
+            auth.token = newToken;
             console.log('✅ Token renovado');
           }
         } catch (tokenError) {
@@ -585,24 +648,42 @@ export async function uploadFileToDrive(
   folderPath: string,
   onProgress?: (progress: number) => void
 ): Promise<{ id: string; name: string; webViewLink: string; webContentLink: string }> {
-  // 1. Verificar autenticação (token centralizado)
-  const isAuth = await isAuthenticated();
-  if (!isAuth) {
-    throw new Error('Google Drive não autorizado. Um administrador precisa autorizar o acesso OAuth primeiro. Acesse: /api/oauth-drive.php');
+  // 1. Obter token (uma única chamada; mensagem de erro vem do servidor)
+  const token0 = await getAccessToken();
+  if (!token0) {
+    const detail = getLastDriveTokenError();
+    throw new Error(
+      detail
+        ? `${detail} Se ainda não autorizou o Drive, um admin deve abrir /api/oauth-drive.php`
+        : 'Não foi possível obter token do Google Drive. Um administrador deve autorizar em /api/oauth-drive.php'
+    );
   }
-
-  // 2. Obter token de acesso centralizado
-  const accessToken = await getAccessToken();
-  if (!accessToken) {
-    throw new Error('Não foi possível obter token de acesso. Verifique se o Google Drive está autorizado.');
-  }
+  const auth = { token: token0 };
 
   // 3. Obter ID da pasta
-  const folderId = await getFolderId(folderPath, accessToken);
+  const folderId = await getFolderId(folderPath, auth.token);
 
   // 4. Decidir entre upload simples ou resumável
   const FILE_SIZE_THRESHOLD = 10 * 1024 * 1024; // 10MB
   const useSimpleUpload = file.size < FILE_SIZE_THRESHOLD;
+
+  const fetchFileMetadata = async (fileId: string) => {
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,webViewLink,webContentLink&supportsAllDrives=true`;
+    let res = await fetch(url, { headers: { Authorization: `Bearer ${auth.token}` } });
+    if (res.status === 401) {
+      invalidateAccessTokenCache();
+      const fresh = await getAccessToken(true);
+      if (fresh) {
+        auth.token = fresh;
+        res = await fetch(url, { headers: { Authorization: `Bearer ${auth.token}` } });
+      }
+    }
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`Erro ao obter informações do arquivo: ${res.status} ${t.substring(0, 200)}`);
+    }
+    return res.json();
+  };
 
   if (useSimpleUpload) {
     // Upload simples (multipart) para arquivos pequenos - mais rápido e confiável
@@ -612,27 +693,13 @@ export async function uploadFileToDrive(
       onProgress(0);
     }
 
-    const fileId = await uploadFileSimple(file, folderId, accessToken, onProgress);
+    const fileId = await uploadFileSimple(file, folderId, auth, onProgress);
     
     if (onProgress) {
       onProgress(100);
     }
     
-    // Obter informações do arquivo (adicionar supportsAllDrives para Shared Drives)
-    const fileInfoResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,webViewLink,webContentLink&supportsAllDrives=true`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!fileInfoResponse.ok) {
-      throw new Error('Erro ao obter informações do arquivo');
-    }
-
-    const fileInfo = await fileInfoResponse.json();
+    const fileInfo = await fetchFileMetadata(fileId);
 
     return {
       id: fileInfo.id,
@@ -652,7 +719,7 @@ export async function uploadFileToDrive(
       file.name,
       file.type || 'application/octet-stream',
       folderId,
-      accessToken
+      auth
     );
 
     if (onProgress) {
@@ -663,7 +730,7 @@ export async function uploadFileToDrive(
     const fileId = await uploadChunks(
       file, 
       uploadUrl, 
-      accessToken,
+      auth,
       file.name,
       file.type || 'application/octet-stream',
       folderId,
@@ -675,21 +742,7 @@ export async function uploadFileToDrive(
       }
     );
 
-    // 6. Obter informações do arquivo (adicionar supportsAllDrives para Shared Drives)
-    const fileInfoResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,webViewLink,webContentLink&supportsAllDrives=true`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (!fileInfoResponse.ok) {
-      throw new Error('Erro ao obter informações do arquivo');
-    }
-
-    const fileInfo = await fileInfoResponse.json();
+    const fileInfo = await fetchFileMetadata(fileId);
 
     return {
       id: fileInfo.id,

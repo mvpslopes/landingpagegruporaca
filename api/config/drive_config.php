@@ -43,6 +43,9 @@ $base = [
     ],
 
     'folder_mapping' => [],
+
+    // Se false, get-drive-token.php não chama drive/v3/about (útil se o servidor bloquear saída HTTPS para Google)
+    'verify_drive_token' => getenv('DRIVE_VERIFY_DRIVE_TOKEN') !== '0',
 ];
 
 $local = __DIR__ . '/drive_config.local.php';

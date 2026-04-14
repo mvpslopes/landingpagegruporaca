@@ -760,18 +760,9 @@ export async function uploadFileDirectToDrive(
 ): Promise<ApiResponse<FileItem>> {
   try {
     // Importar utilitário do Google Drive
-    const { 
-      checkAuthorization,
-      uploadFileToDrive 
-    } = await import('./googleDrive');
+    const { uploadFileToDrive } = await import('./googleDrive');
 
-    // Verificar se Google Drive está autorizado (token centralizado)
-    const isAuthorized = await checkAuthorization();
-    if (!isAuthorized) {
-      throw new Error('Google Drive não autorizado. Um administrador precisa autorizar o acesso OAuth primeiro. Acesse: /api/oauth-drive.php');
-    }
-
-    // Fazer upload direto para Google Drive usando token centralizado
+    // Token e mensagens de erro vêm de get-drive-token.php (sem checagem duplicada)
     const driveFile = await uploadFileToDrive(file, folder, onProgress);
 
     // Registrar metadados no servidor

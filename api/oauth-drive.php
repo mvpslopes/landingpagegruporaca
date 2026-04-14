@@ -163,8 +163,54 @@ $client->setScopes($config['scopes']);
 $client->setAccessType('offline');
 $client->setPrompt('consent'); // Forçar consentimento para obter refresh token
 
+$oauthClientId = trim((string)($config['oauth_client_id'] ?? ''));
+$oauthClientSecret = trim((string)($config['oauth_client_secret'] ?? ''));
+$oauthNotConfigured = ($oauthClientId === '' || $oauthClientSecret === '');
+
 // GET: Obter URL de autenticação
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['code'])) {
+    if ($oauthNotConfigured) {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $isBrowser = strpos($userAgent, 'Mozilla') !== false || strpos($userAgent, 'Chrome') !== false || strpos($userAgent, 'Safari') !== false;
+        if ($isBrowser) {
+            header('Content-Type: text/html; charset=utf-8');
+            http_response_code(503);
+            ?>
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>OAuth Google não configurado</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 24px; }
+                    .box { background: #fff; border-radius: 12px; padding: 28px; max-width: 560px; margin: 40px auto; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+                    h1 { color: #c5221f; margin-top: 0; font-size: 1.35rem; }
+                    code { background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+                    ol { line-height: 1.7; color: #333; }
+                    .hint { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 14px 16px; margin-top: 20px; border-radius: 4px; color: #174ea6; }
+                </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h1>Erro 400 do Google: falta o Client ID</h1>
+                    <p>O servidor não tem <strong>Client ID</strong> e <strong>Client Secret</strong> do OAuth configurados. Por isso o Google mostra: <em>Missing required parameter: client_id</em>.</p>
+                    <p><strong>O que fazer (na hospedagem):</strong></p>
+                    <ol>
+                        <li>No <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, crie credenciais OAuth (tipo Aplicativo Web).</li>
+                        <li>Defina variáveis de ambiente <code>GOOGLE_OAUTH_CLIENT_ID</code> e <code>GOOGLE_OAUTH_CLIENT_SECRET</code> com os valores do projeto, <strong>ou</strong> copie <code>api/config/drive_config.example.php</code> para <code>api/config/drive_config.local.php</code> e preencha <code>oauth_client_id</code> e <code>oauth_client_secret</code>.</li>
+                        <li>Em URIs de redirecionamento autorizados, inclua exatamente: <code><?php echo htmlspecialchars($config['oauth_redirect_uri'] ?? '', ENT_QUOTES, 'UTF-8'); ?></code></li>
+                    </ol>
+                    <div class="hint">Depois de salvar a configuração, recarregue esta página para autorizar o Google Drive.</div>
+                </div>
+            </body>
+            </html>
+            <?php
+            exit;
+        }
+        jsonError('OAuth não configurado: defina GOOGLE_OAUTH_CLIENT_ID e GOOGLE_OAUTH_CLIENT_SECRET (ou drive_config.local.php). Sem isso o Google retorna erro 400 (client_id ausente).', 503);
+    }
+
     $authUrl = $client->createAuthUrl();
     
     // Se for requisição de navegador, redirecionar automaticamente
@@ -186,6 +232,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['code'])) {
 
 // GET: Receber código de autorização
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['code'])) {
+    if ($oauthNotConfigured) {
+        jsonError('OAuth não configurado: defina GOOGLE_OAUTH_CLIENT_ID e GOOGLE_OAUTH_CLIENT_SECRET antes de concluir a autorização.', 503);
+    }
     try {
         $accessToken = $client->fetchAccessTokenWithAuthCode($_GET['code']);
         
