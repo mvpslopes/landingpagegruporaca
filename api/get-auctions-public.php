@@ -1,7 +1,7 @@
 <?php
 /**
  * API Pública para Buscar Leilões (usado pelo site)
- * Retorna apenas leilões ativos, ordenados por data
+ * Retorna apenas leilões ativos, priorizando a semana corrente
  */
 
 require_once 'config.php';
@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             error_log('Aviso: não foi possível desativar leilões encerrados: ' . $e->getMessage());
         }
         
-        // Buscar apenas leilões ativos, ordenados por data de início
+        // Buscar apenas leilões ativos (ordenação final por semana corrente abaixo)
         $stmt = $conn->prepare("
             SELECT 
                 id,
@@ -37,14 +37,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 end_date,
                 image_path,
                 image_drive_id,
-                link_url
+                link_url,
+                created_at
             FROM auctions
             WHERE active = 1
               AND end_date >= CURDATE()
-            ORDER BY start_date ASC, created_at DESC
         ");
         $stmt->execute();
         $auctions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Semana corrente: segunda 00:00 até domingo 23:59:59
+        $today = new DateTime();
+        $today->setTime(0, 0, 0);
+        $weekStart = clone $today;
+        $dayOfWeek = (int)$weekStart->format('N'); // 1=segunda ... 7=domingo
+        $weekStart->modify('-' . ($dayOfWeek - 1) . ' days');
+        $weekStart->setTime(0, 0, 0);
+        $weekEnd = clone $weekStart;
+        $weekEnd->modify('+6 days');
+        $weekEnd->setTime(23, 59, 59);
         
         // Formatar para o frontend
         $formattedAuctions = [];
@@ -53,8 +64,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $endDate = new DateTime($auction['end_date']);
             
             // Calcular status
-            $today = new DateTime();
-            $today->setTime(0, 0, 0);
             $startDate->setTime(0, 0, 0);
             $endDate->setTime(0, 0, 0);
             
@@ -64,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             } elseif ($today >= $startDate && $today <= $endDate) {
                 $status = 'NO_AR';
             }
+
+            // Destaque da semana: começa OU termina na semana corrente
+            $isCurrentWeek = ($startDate >= $weekStart && $startDate <= $weekEnd)
+                || ($endDate >= $weekStart && $endDate <= $weekEnd);
             
             // Formatar data para exibição (formato brasileiro)
             $dateDisplay = '';
@@ -111,9 +124,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         ? '/api/view-auction-image.php?id=' . $auction['image_drive_id'] 
                         : ''),
                 'link_url' => $auction['link_url'] ?: null,
-                'status' => $status
+                'status' => $status,
+                '_isCurrentWeek' => $isCurrentWeek,
+                '_startTs' => $startDate->getTimestamp()
             ];
         }
+
+        // Prioridade: semana corrente > NO_AR > EM_BREVE > proximidade da data
+        usort($formattedAuctions, function ($a, $b) use ($today) {
+            $aWeek = !empty($a['_isCurrentWeek']) ? 0 : 1;
+            $bWeek = !empty($b['_isCurrentWeek']) ? 0 : 1;
+            if ($aWeek !== $bWeek) {
+                return $aWeek - $bWeek;
+            }
+
+            $statusRank = function ($status) {
+                if ($status === 'NO_AR' || $status === 'NO AR') return 0;
+                if ($status === 'EM_BREVE') return 1;
+                return 2;
+            };
+
+            $statusDiff = $statusRank($a['status']) - $statusRank($b['status']);
+            if ($statusDiff !== 0) {
+                return $statusDiff;
+            }
+
+            $nowTs = $today->getTimestamp();
+            $aDistance = abs(($a['_startTs'] ?? $nowTs) - $nowTs);
+            $bDistance = abs(($b['_startTs'] ?? $nowTs) - $nowTs);
+            if ($aDistance !== $bDistance) {
+                return $aDistance <=> $bDistance;
+            }
+
+            return ($a['_startTs'] ?? 0) <=> ($b['_startTs'] ?? 0);
+        });
+
+        // Remover campos auxiliares de ordenação
+        $formattedAuctions = array_map(function ($auction) {
+            unset($auction['_isCurrentWeek'], $auction['_startTs']);
+            return $auction;
+        }, $formattedAuctions);
         
         jsonResponse([
             'auctions' => $formattedAuctions,

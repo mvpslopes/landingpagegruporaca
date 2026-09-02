@@ -20,6 +20,55 @@ interface Auction {
   link_url?: string;
 }
 
+/** Semana corrente: segunda 00:00 até domingo 23:59:59 */
+function getCurrentWeekRange(reference = new Date()) {
+  const start = new Date(reference);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay(); // 0=domingo
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  start.setDate(start.getDate() - daysFromMonday);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+}
+
+/** Destaque da semana: começa OU termina na semana corrente (não basta atravessar o período) */
+function isCurrentWeekHighlight(auction: Auction, weekStart: Date, weekEnd: Date) {
+  const startsThisWeek = auction.startDate >= weekStart && auction.startDate <= weekEnd;
+  const endsThisWeek = auction.endDate >= weekStart && auction.endDate <= weekEnd;
+  return startsThisWeek || endsThisWeek;
+}
+
+function statusRank(status?: string) {
+  if (status === 'NO_AR' || status === 'NO AR') return 0;
+  if (status === 'EM_BREVE') return 1;
+  return 2;
+}
+
+function sortAuctionsByCurrentWeek(auctions: Auction[]) {
+  const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
+  const now = Date.now();
+
+  return [...auctions].sort((a, b) => {
+    const aWeek = isCurrentWeekHighlight(a, weekStart, weekEnd) ? 0 : 1;
+    const bWeek = isCurrentWeekHighlight(b, weekStart, weekEnd) ? 0 : 1;
+    if (aWeek !== bWeek) return aWeek - bWeek;
+
+    const statusDiff = statusRank(a.status) - statusRank(b.status);
+    if (statusDiff !== 0) return statusDiff;
+
+    // Mais próximos da data corrente primeiro
+    const aDistance = Math.abs(a.startDate.getTime() - now);
+    const bDistance = Math.abs(b.startDate.getTime() - now);
+    if (aDistance !== bDistance) return aDistance - bDistance;
+
+    return a.startDate.getTime() - b.startDate.getTime();
+  });
+}
+
 
 export default function FeaturedAuctions() {
   const { ref: titleRef, isVisible: titleVisible } = useScrollReveal({ threshold: 0.2 });
@@ -77,12 +126,8 @@ export default function FeaturedAuctions() {
             };
           });
           
-          // Ordenar por data de início (mais antigo primeiro)
-          formattedAuctions.sort((a: Auction, b: Auction) => {
-            return a.startDate.getTime() - b.startDate.getTime();
-          });
-          
-          setAuctions(formattedAuctions);
+          // Prioriza destaques da semana corrente, depois NO_AR / EM_BREVE e proximidade da data
+          setAuctions(sortAuctionsByCurrentWeek(formattedAuctions));
         } else {
           console.warn('Resposta da API não contém array de leilões:', data);
           setAuctions([]);
